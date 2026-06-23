@@ -2,39 +2,36 @@ package android.learn.habitapp
 
 import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
+import android.learn.habitapp.ui.theme.HabitAppTheme
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import android.learn.habitapp.ui.theme.HabitAppTheme
-import android.util.Log
-import androidx.activity.compose.BackHandler
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -50,18 +47,33 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.blur.HazeColorEffect
@@ -69,19 +81,6 @@ import dev.chrisbanes.haze.blur.blurEffect
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.focus.FocusManager
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 
 @AndroidEntryPoint
@@ -131,7 +130,13 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
 
    var isSearchExpanded by remember { mutableStateOf(false) }
    val focusManager = LocalFocusManager.current
-
+   val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+   val animationDuration  = 300
+   val dynamicTopPadding by animateDpAsState(
+      targetValue = if (isSearchExpanded) statusBarHeight else 0.dp,
+      animationSpec = tween(durationMillis = animationDuration),
+      label = "StatusBarTransition"
+   )
    BackHandler(enabled = isSearchExpanded) {
       isSearchExpanded = false
       habitViewModel.onSearchQueryChange("")
@@ -140,139 +145,123 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
 
    // Leave Scaffold's topBar blank so we can dynamically control the top area ourselves
    Scaffold { innerPadding ->
-      SharedTransitionLayout() {
+      Column(
+         modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = innerPadding.calculateBottomPadding())
+      )
+      {
          Column(
-            modifier = Modifier
-
-               .animateContentSize()
-               .fillMaxSize()
-               .padding(bottom = innerPadding.calculateBottomPadding())
+            modifier = Modifier.fillMaxWidth()
          )
          {
-            if (!isSearchExpanded) {
-               // NORMAL STATE: Render the real top app bar
-               TopAppBar(
-                  title = { Text("My Habits", style = MaterialTheme.typography.titleLarge) },
-                  modifier = Modifier.statusBarsPadding()
-               )
-            } else {
-               Spacer(modifier = Modifier.statusBarsPadding())
-            }
+            AnimatedTopAppBar(isSearchExpanded, animationDuration)
 
-            AnimatedContent(
-               targetState = isSearchExpanded,
-               transitionSpec = {
-                  fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
-               },
-               label = "HeaderTransition"
+
+
+            CustomSearchHabitBar(
+               query = searchQuery,
+               isExpanded = isSearchExpanded,
+               onExpandedChange = { isSearchExpanded = it },
+               onQueryChange = { habitViewModel.onSearchQueryChange(it) },
+               modifier = Modifier
+                  .padding(top = dynamicTopPadding)
+                  .padding(horizontal = 16.dp, vertical = 8.dp)
+                  .fillMaxWidth()
             )
-            { expaned ->
-               val expand = expaned
-               // --- THE DYNAMIC TOP AREA SYSTEM ---
-
-               // Render the search bar right beneath it with padding and round corners
-//               CustomSearchHabitBar(
-//                  query = searchQuery,
-//                  isExpanded = false,
-//                  onExpandedChange = { isSearchExpanded = it },
-//                  onQueryChange = { habitViewModel.onSearchQueryChange(it) },
-//                  modifier = Modifier
-//                     .sharedBounds(
-//                        rememberSharedContentState(key = "search_bar_bounds"),
-//                        animatedVisibilityScope = this@AnimatedContent
-//                     )
-//                     .padding(horizontal = 16.dp, vertical = 8.dp)
-//               ) {
-//                  /* No dropdown content needed when unexpanded */
-//               }
-//
-//               } else {
-               // EXPANDED STATE: The TopAppBar is completely gone!
-               // The search bar is rendered at the absolute top, stretching flush to act as the header.
-               CustomSearchHabitBar(
-                  query = searchQuery,
-                  isExpanded = isSearchExpanded,
-                  onExpandedChange = { isSearchExpanded = it },
-                  onQueryChange = { habitViewModel.onSearchQueryChange(it) },
-                  modifier = Modifier
-                     .sharedBounds(
-                        rememberSharedContentState(key = "search_bar_bounds"),
-                        animatedVisibilityScope = this@AnimatedContent
-                     )
-                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                     .fillMaxWidth()
-               )
-               {
-                  // Dropdown search results appear right here
-                  if (filteredHabits.isEmpty() && searchQuery.isNotEmpty()) {
-                     Text(
-                        text = "No habits match your search.",
-                        modifier = Modifier.padding(16.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                     )
-                  } else {
-                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(filteredHabits, key = { it.id }) { habit ->
-                           Row(
-                              modifier = Modifier
-                                 .fillMaxWidth()
-                                 .clickable {
-                                    habitViewModel.onHabitChecked(habit.id)
-                                    isSearchExpanded = false
-                                    focusManager.clearFocus()
-                                 }
-                                 .padding(16.dp),
-                              verticalAlignment = Alignment.CenterVertically
-                           ) {
-                              Icon(
-                                 imageVector = Icons.Default.Bolt,
-                                 contentDescription = null,
-                                 modifier = Modifier.padding(end = 12.dp),
-                                 tint = MaterialTheme.colorScheme.primary
-                              )
-                              Text(text = habit.name, style = MaterialTheme.typography.bodyLarge)
-                           }
+            {
+               // Dropdown search results appear right here
+               if (filteredHabits.isEmpty() && searchQuery.isNotEmpty()) {
+                  Text(
+                     text = "No habits match your search.",
+                     modifier = Modifier.padding(16.dp),
+                     style = MaterialTheme.typography.bodyMedium,
+                     color = Color.Gray
+                  )
+               } else {
+                  LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                     items(filteredHabits, key = { it.id }) { habit ->
+                        Row(
+                           modifier = Modifier
+                              .fillMaxWidth()
+                              .clickable {
+                                 habitViewModel.onHabitChecked(habit.id)
+                                 isSearchExpanded = false
+                                 focusManager.clearFocus()
+                              }
+                              .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                           Icon(
+                              imageVector = Icons.Default.Bolt,
+                              contentDescription = null,
+                              modifier = Modifier.padding(end = 12.dp),
+                              tint = MaterialTheme.colorScheme.primary
+                           )
+                           Text(text = habit.name, style = MaterialTheme.typography.bodyLarge)
                         }
                      }
                   }
                }
             }
-            // --- MAIN BODY CONTENT AREA BELOW THE SEARCH SECTOR ---
-            Box(
-               modifier = Modifier
-                  .fillMaxWidth()
-                  .weight(1f)
-            ) {
-               // Layer 1: Regular habit elements list
-               when (habitUiState) {
-                  is UiState.Success -> HabitList(habits) { habitId ->
-                     habitViewModel.onHabitChecked(habitId)
-                  }
-
-                  is UiState.Loading -> LoadingSpinner()
-                  is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
+         }      // --- MAIN BODY CONTENT AREA BELOW THE SEARCH SECTOR ---
+         Box(
+            modifier = Modifier
+               .fillMaxWidth()
+               .weight(1f)
+         )
+         {
+            // Layer 1: Regular habit elements list
+            when (habitUiState) {
+               is UiState.Success -> HabitList(habits) { habitId ->
+                  habitViewModel.onHabitChecked(habitId)
                }
 
-               // Layer 2: Blackout scrim to blur/hide the list background layout when searching
-               if (isSearchExpanded) {
-                  Box(
-                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable(
-                           interactionSource = remember { MutableInteractionSource() },
-                           indication = null
-                        ) {
-                           isSearchExpanded = false
-                           habitViewModel.onSearchQueryChange("")
-                           focusManager.clearFocus()
-                        }
-                  )
-               }
+               is UiState.Loading -> LoadingSpinner()
+               is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
+            }
+
+            // Layer 2: Blackout scrim to blur/hide the list background layout when searching
+            if (isSearchExpanded) {
+               Box(
+                  modifier = Modifier
+                     .fillMaxSize()
+                     .background(Color.Black.copy(alpha = 0.4f))
+                     .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                     ) {
+                        isSearchExpanded = false
+                        habitViewModel.onSearchQueryChange("")
+                        focusManager.clearFocus()
+                     })
             }
          }
       }
+   }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ColumnScope.AnimatedTopAppBar(isSearchExpanded: Boolean, animationDuration: Int) {
+   AnimatedVisibility(
+      visible = !isSearchExpanded,
+      enter = expandVertically() + fadeIn(
+         animationSpec = tween(
+            animationDuration
+         )
+      ),
+      exit = shrinkVertically() + fadeOut(
+         animationSpec = tween(
+            animationDuration
+         )
+      )
+   ) {
+      // NORMAL STATE: Render the real top app bar
+      TopAppBar(
+         title = { Text("My Habits", style = MaterialTheme.typography.titleLarge) },
+         modifier = Modifier
+            .statusBarsPadding()
+            .animateContentSize(animationSpec = tween(5000))
+      )
    }
 }
 
@@ -298,7 +287,7 @@ fun CustomSearchHabitBar(
       modifier = modifier
          .animateContentSize()
          // Dynamically flattens layout shape corners down to 0 when acting as the TopAppBar header
-         .clip(RoundedCornerShape( 28.dp))
+         .clip(RoundedCornerShape(28.dp))
          .background(MaterialTheme.colorScheme.surfaceContainerHigh)
    ) {
       Row(
@@ -352,7 +341,7 @@ fun CustomSearchHabitBar(
                focusedIndicatorColor = Color.Transparent,
                unfocusedIndicatorColor = Color.Transparent,
 
-            ),
+               ),
             singleLine = true
          )
       }
@@ -420,11 +409,9 @@ fun SearchHabitBar(
             onExpandedChange = onExpandedChange,
             placeholder = { Text("Search habits...") },
             leadingIcon = {
-               if (isExpanded)
-                  Icon(Icons.Default.ArrowBackIosNew, contentDescription = "Back")
+               if (isExpanded) Icon(Icons.Default.ArrowBackIosNew, contentDescription = "Back")
                else Icon(Icons.Default.Search, contentDescription = null)
-            }
-         )
+            })
       },
       content = content
    )
