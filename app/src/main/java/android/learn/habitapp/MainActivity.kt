@@ -143,100 +143,95 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
       SharedTransitionLayout() {
          Column(
             modifier = Modifier
+
+               .animateContentSize()
                .fillMaxSize()
                .padding(bottom = innerPadding.calculateBottomPadding())
          )
          {
+            if (!isSearchExpanded) {
+               // NORMAL STATE: Render the real top app bar
+               TopAppBar(
+                  title = { Text("My Habits", style = MaterialTheme.typography.titleLarge) },
+                  modifier = Modifier.statusBarsPadding()
+               )
+            } else {
+               Spacer(modifier = Modifier.statusBarsPadding())
+            }
 
-               AnimatedContent(
-                  targetState = isSearchExpanded,
-                  transitionSpec = {
-                     fadeIn(animationSpec = tween(300)) togetherWith fadeOut(
-                        animationSpec = tween(
-                           300
-                        )
+            AnimatedContent(
+               targetState = isSearchExpanded,
+               transitionSpec = {
+                  fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+               },
+               label = "HeaderTransition"
+            )
+            { expaned ->
+               val expand = expaned
+               // --- THE DYNAMIC TOP AREA SYSTEM ---
+
+               // Render the search bar right beneath it with padding and round corners
+//               CustomSearchHabitBar(
+//                  query = searchQuery,
+//                  isExpanded = false,
+//                  onExpandedChange = { isSearchExpanded = it },
+//                  onQueryChange = { habitViewModel.onSearchQueryChange(it) },
+//                  modifier = Modifier
+//                     .sharedBounds(
+//                        rememberSharedContentState(key = "search_bar_bounds"),
+//                        animatedVisibilityScope = this@AnimatedContent
+//                     )
+//                     .padding(horizontal = 16.dp, vertical = 8.dp)
+//               ) {
+//                  /* No dropdown content needed when unexpanded */
+//               }
+//
+//               } else {
+               // EXPANDED STATE: The TopAppBar is completely gone!
+               // The search bar is rendered at the absolute top, stretching flush to act as the header.
+               CustomSearchHabitBar(
+                  query = searchQuery,
+                  isExpanded = isSearchExpanded,
+                  onExpandedChange = { isSearchExpanded = it },
+                  onQueryChange = { habitViewModel.onSearchQueryChange(it) },
+                  modifier = Modifier
+                     .sharedBounds(
+                        rememberSharedContentState(key = "search_bar_bounds"),
+                        animatedVisibilityScope = this@AnimatedContent
                      )
-                  },
-                  label = "HeaderTransition"
-               ) { expanded ->
-
-            Column {
-                  // --- THE DYNAMIC TOP AREA SYSTEM ---
-                  if (!expanded) {
-                     // NORMAL STATE: Render the real top app bar
-                     TopAppBar(
-                        title = { Text("My Habits", style = MaterialTheme.typography.titleLarge) },
-                        modifier = Modifier.statusBarsPadding()
+                     .padding(horizontal = 16.dp, vertical = 8.dp)
+                     .fillMaxWidth()
+               )
+               {
+                  // Dropdown search results appear right here
+                  if (filteredHabits.isEmpty() && searchQuery.isNotEmpty()) {
+                     Text(
+                        text = "No habits match your search.",
+                        modifier = Modifier.padding(16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray
                      )
-
-                     // Render the search bar right beneath it with padding and round corners
-                     CustomSearchHabitBar(
-                        query = searchQuery,
-                        isExpanded = false,
-                        onExpandedChange = { isSearchExpanded = it },
-                        onQueryChange = { habitViewModel.onSearchQueryChange(it) },
-                        modifier = Modifier
-                           .sharedBounds(
-                              rememberSharedContentState(key = "search_bar_bounds"),
-                              animatedVisibilityScope = this@AnimatedContent
-                           )
-                           .padding(horizontal = 16.dp, vertical = 8.dp)
-                     ) {
-                        /* No dropdown content needed when unexpanded */
-                     }
-
                   } else {
-                     // EXPANDED STATE: The TopAppBar is completely gone!
-                     // The search bar is rendered at the absolute top, stretching flush to act as the header.
-                     CustomSearchHabitBar(
-                        query = searchQuery,
-                        isExpanded = true,
-                        onExpandedChange = { isSearchExpanded = it },
-                        onQueryChange = { habitViewModel.onSearchQueryChange(it) },
-                        modifier = Modifier
-                           .sharedBounds(
-                              rememberSharedContentState(key = "search_bar_bounds"),
-                              animatedVisibilityScope = this@AnimatedContent
-                           )
-                           .statusBarsPadding() // Pushes it neatly under the system clock/battery icons
-
-                           .padding(horizontal = 16.dp, vertical = 8.dp)
-                           .fillMaxWidth()
-                     ) {
-                        // Dropdown search results appear right here
-                        if (filteredHabits.isEmpty() && searchQuery.isNotEmpty()) {
-                           Text(
-                              text = "No habits match your search.",
-                              modifier = Modifier.padding(16.dp),
-                              style = MaterialTheme.typography.bodyMedium,
-                              color = Color.Gray
-                           )
-                        } else {
-                           LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                              items(filteredHabits, key = { it.id }) { habit ->
-                                 Row(
-                                    modifier = Modifier
-                                       .fillMaxWidth()
-                                       .clickable {
-                                          habitViewModel.onHabitChecked(habit.id)
-                                          isSearchExpanded = false
-                                          focusManager.clearFocus()
-                                       }
-                                       .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                 ) {
-                                    Icon(
-                                       imageVector = Icons.Default.Bolt,
-                                       contentDescription = null,
-                                       modifier = Modifier.padding(end = 12.dp),
-                                       tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                       text = habit.name,
-                                       style = MaterialTheme.typography.bodyLarge
-                                    )
+                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(filteredHabits, key = { it.id }) { habit ->
+                           Row(
+                              modifier = Modifier
+                                 .fillMaxWidth()
+                                 .clickable {
+                                    habitViewModel.onHabitChecked(habit.id)
+                                    isSearchExpanded = false
+                                    focusManager.clearFocus()
                                  }
-                              }
+                                 .padding(16.dp),
+                              verticalAlignment = Alignment.CenterVertically
+                           ) {
+                              Icon(
+                                 imageVector = Icons.Default.Bolt,
+                                 contentDescription = null,
+                                 modifier = Modifier.padding(end = 12.dp),
+                                 tint = MaterialTheme.colorScheme.primary
+                              )
+                              Text(text = habit.name, style = MaterialTheme.typography.bodyLarge)
                            }
                         }
                      }
@@ -293,13 +288,11 @@ fun CustomSearchHabitBar(
    val focusManager = LocalFocusManager.current
    val focusRequester = remember { FocusRequester() }
 
-   // AUTOMATION: As soon as isExpanded becomes true, automatically request focus and open keyboard
    if (isExpanded) {
       LaunchedEffect(Unit) {
          focusRequester.requestFocus()
       }
    }
-
 
    Column(
       modifier = modifier
@@ -357,13 +350,14 @@ fun CustomSearchHabitBar(
                unfocusedContainerColor = Color.Transparent,
                disabledContainerColor = Color.Transparent,
                focusedIndicatorColor = Color.Transparent,
-               unfocusedIndicatorColor = Color.Transparent
+               unfocusedIndicatorColor = Color.Transparent,
+
             ),
             singleLine = true
          )
       }
 
-      if (isExpanded) {
+      if (isExpanded && query.isNotEmpty()) {
          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
          Column(
             modifier = Modifier
