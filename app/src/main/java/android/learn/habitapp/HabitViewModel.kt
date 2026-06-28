@@ -1,12 +1,13 @@
 package android.learn.habitapp
 
-import android.R.attr.action
 import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.local.HabitLogsEntity
 import android.learn.habitapp.data.local.HabitWithLogs
 import android.learn.habitapp.data.repository.HabitRepository
 import android.learn.habitapp.ui.HabitUiState
+import android.learn.habitapp.ui.SelectedHabit
 import android.learn.habitapp.ui.UiState
+import androidx.compose.ui.geometry.Rect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -29,7 +31,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    val searchQuery = _searchQuery.asStateFlow()
 
    val habitsUiState = combine(
-      habitRepository.getHabitWithLogs(),
+      habitRepository.getHabitsWithLogs(),
       _searchQuery
    ) { rawData, query ->
       val transformed = transformToUiState(rawData)
@@ -43,18 +45,44 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    init {
       loadHabits()
    }
+   private val _selectedHabit = MutableStateFlow(
 
+      SelectedHabit(habitId = -1, bounds = Rect.Zero, expanded = false)
+   )
+   val selectedHabit = _selectedHabit.asStateFlow()
+
+   fun selectHabit(habitId: Int, bounds: Rect) {
+      _selectedHabit.value = SelectedHabit(habitId, bounds, false)
+   }
+   fun clearSelection() {
+      // Just set expanded to false, DON'T reset the ID yet
+      _selectedHabit.value = _selectedHabit.value.copy(expanded = false)
+   }
+
+   fun resetToIdle() {
+      // ONLY call this when the animation is 100% finished
+      _selectedHabit.value = SelectedHabit(habitId = -1, bounds = Rect.Zero, expanded = false)
+   }
    fun onSearchQueryChange(newQuery: String) {
       _searchQuery.value = newQuery
    }
    private fun loadHabits() {
-      viewModelScope.launch(Dispatchers.IO) {
-         habitRepository.getHabitWithLogs().collect { rawData ->
+      viewModelScope.launch(Dispatchers.Default) {
+         habitRepository.getHabitsWithLogs().collect { rawData ->
             _habitUiState.value = UiState.Success(transformToUiState(rawData))
          }
       }
    }
-
+   suspend fun loadHabit(habitId: Int): HabitUiState = withContext(Dispatchers.IO) {
+//      val habit = HabitEntity("")
+         val habit = habitRepository.load(habitId)
+      return@withContext HabitUiState(
+         id = habit.id,
+         name = habit.name,
+         isDoneToday = true,
+         emoji = habit.emoji
+      )
+   }
 
    fun onHabitChecked(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
@@ -84,17 +112,29 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }
 
-   fun onAddHabit(name: String, iconName: String) {
+   fun onAddHabit(name: String, emoji: String) {
       viewModelScope.launch(Dispatchers.IO) {
          habitRepository.insertHabit(
             HabitEntity(
                name = name,
-               iconName = iconName
+               emoji = emoji
             )
          )
       }
    }
 
+
+   fun onSaveHabit(habitId: Int, name: String, emoji: String) {
+      viewModelScope.launch(Dispatchers.IO) {
+         habitRepository.insertHabit(
+            HabitEntity(
+               id = habitId,
+               name = name,
+               emoji = emoji
+            )
+         )
+      }
+   }
    private fun transformToUiState(habitWithLogs: List<HabitWithLogs>): List<HabitUiState> {
       val today = getStartOfTodayTimestamp()
 
@@ -104,17 +144,20 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
             id = habit.id,
             name = habit.name,
             isDoneToday = it.logs.any { it.date == today },
-            iconName = habit.iconName
+            emoji = habit.emoji
          )
       }
    }
 
-   fun getStartOfTodayTimestamp(): Long {
-      return LocalDate.now(ZoneId.systemDefault())
-         .atStartOfDay(ZoneId.systemDefault())
-         .toInstant()
-         .toEpochMilli()
+   fun expandSelected() {
+      _selectedHabit.value =  _selectedHabit.value.copy(expanded = true)
    }
 
 
+}
+fun getStartOfTodayTimestamp(): Long {
+   return LocalDate.now(ZoneId.systemDefault())
+      .atStartOfDay(ZoneId.systemDefault())
+      .toInstant()
+      .toEpochMilli()
 }

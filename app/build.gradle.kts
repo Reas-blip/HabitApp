@@ -52,6 +52,14 @@ android {
       targetCompatibility = JavaVersion.VERSION_17
    }
 
+   packaging {
+      resources {
+         excludes += "META-INF/LICENSE.md"
+         excludes += "META-INF/LICENSE.txt"
+         excludes += "META-INF/NOTICE.md"
+         excludes += "META-INF/NOTICE.txt"
+      }
+   }
    buildFeatures {
       compose = true
    }
@@ -67,13 +75,15 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
 
 
 dependencies {
-
+   implementation("androidx.compose.animation:animation")
    implementation(libs.androidx.runner)
    implementation(libs.koin.android)
    implementation(libs.koin.androidx.compose)
    implementation(libs.hilt.android)
+   implementation(libs.androidx.hilt.navigation.compose)
    implementation(libs.dev.haze.blur)
    implementation(libs.haze)
+   implementation(libs.navigation.compose)
    ksp(libs.hilt.android.compiler)
    implementation(libs.retrofit)
    implementation(libs.converter.gson)

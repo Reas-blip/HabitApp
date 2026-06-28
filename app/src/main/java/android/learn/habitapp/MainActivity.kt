@@ -1,60 +1,103 @@
 package android.learn.habitapp
 
+import android.annotation.SuppressLint
+import android.learn.habitapp.data.emoji.HabitEmoji
+import android.learn.habitapp.data.emoji.HabitEmojiData
+import android.learn.habitapp.data.repository.HabitEmojiRepository
+import android.learn.habitapp.ui.CardState
 import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
 import android.learn.habitapp.ui.theme.HabitAppTheme
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColor
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateRect
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.ModeEditOutline
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -62,6 +105,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,52 +114,521 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.blur.HazeColorEffect
-import dev.chrisbanes.haze.blur.blurEffect
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.launch
 
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
    val habitViewModel: HabitViewModel by viewModels()
+
+
    override fun onCreate(savedInstanceState: Bundle?) {
       super.onCreate(savedInstanceState)
       enableEdgeToEdge()
       setContent {
+         val coroutineScope = rememberCoroutineScope()
+         val navController = rememberNavController()
          HabitAppTheme {
-            HabitMainScreen(habitViewModel)
+            HabitMainScreen(habitViewModel) { }
+         }
+      }
+   }
+}
+
+
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HabitEmojiPickerSheet(
+   onEmojiSelected: (String) -> Unit,
+   onDismissRequest: () -> Unit,
+   onCloseSheet: () -> Unit,
+   sheetState: SheetState = rememberModalBottomSheetState()
+) {
+   var searchQuery by rememberSaveable {
+      mutableStateOf("")
+   }
+
+   var selectedCategory by rememberSaveable {
+      mutableStateOf("Fitness")
+   }
+   val categories = HabitEmojiData.categories
+
+   val currentCategory = categories.first {
+      it.name == selectedCategory
+   }
+
+   val filteredEmojis: List<HabitEmoji> = remember(
+      currentCategory, searchQuery
+   ) {
+      val items = HabitEmojiRepository.getByCategory(selectedCategory)
+      HabitEmojiRepository.search(searchQuery, items)
+   }
+
+   val IosSnappySpring = spring<Dp>(
+      dampingRatio = 0.75f,      // Bouncy enough to feel alive, tight enough to remain professional
+      stiffness = 600f          // Rapid acceleration towards the target size
+   )
+   ModalBottomSheet(
+      modifier = Modifier,
+      onDismissRequest = onDismissRequest,
+      sheetState = sheetState,
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+   ) {
+      Column(
+         modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(bottom = 24.dp)
+      ) {
+         Text(
+            text = "Choose Habit Icon",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(bottom = 16.dp)
+         )
+         val focusManager = LocalFocusManager.current
+         LazyRow(
+            modifier = Modifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+         ) {
+            item("search") {
+               val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+
+               var isFocused by remember { mutableStateOf(false) }
+
+               val animatedWidth by animateDpAsState(
+                  targetValue = if (isFocused) screenWidth * 0.6f else 120.dp,
+                  animationSpec = IosSnappySpring, // Smooth 300ms transition
+                  label = "SearchBarWidth"
+               )
+               // Track the scaling font size starting from a base value (e.g., 14sp or 16sp)
+               var currentFontSize by remember { mutableStateOf(14f) }
+               // Reset text size when query clears or focus shifts to avoid getting permanently stuck small
+               LaunchedEffect(searchQuery) {
+                  if (searchQuery.isEmpty()) currentFontSize = 14f
+               }
+
+               BasicTextField(
+                  value = searchQuery,
+                  onValueChange = { searchQuery = it },
+                  modifier = Modifier
+                     .height(40.dp)
+                     .width(animatedWidth)
+                     .onFocusChanged { isFocused = it.isFocused },
+                  singleLine = true,
+                  cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                  textStyle = TextStyle(
+                     fontFamily = MaterialTheme.typography.displaySmall.fontFamily,
+                     fontWeight = MaterialTheme.typography.displaySmall.fontWeight,
+                     fontSize = currentFontSize.sp,                 // Dynamic Font Size
+                     lineHeight = currentFontSize.sp,               // FORCE cursor to match text height
+                     platformStyle = PlatformTextStyle(
+                        includeFontPadding = false                 // Strips weird OS font padding misalignment
+                     ),
+                     color = MaterialTheme.colorScheme.onSurface
+                  ),
+                  decorationBox = { innerTextField ->
+                     Row(
+                        modifier = Modifier
+                           .background(
+                              color = if (isFocused) Color.Transparent else Color(0xFF615D6B),
+                              shape = RoundedCornerShape(50)
+                           )
+                           .border(
+                              width = if (isFocused) 1.dp else 0.dp,
+                              color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                              shape = RoundedCornerShape(50)
+                           )
+                           .padding(horizontal = 12.dp)
+                           .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                     ) {
+                        Icon(
+                           Icons.Default.Search,
+                           contentDescription = null,
+                           tint = if (isFocused) MaterialTheme.colorScheme.primary else Color.White
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Box(
+                           modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart
+                        ) {
+                           if (searchQuery.isEmpty()) {
+                              Text(
+                                 text = "Search emojis", style = TextStyle(
+                                    fontFamily = MaterialTheme.typography.displaySmall.fontFamily,
+                                    fontWeight = MaterialTheme.typography.displaySmall.fontWeight,
+                                    fontSize = currentFontSize.sp,
+                                    lineHeight = currentFontSize.sp,
+                                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                    color = Color.White.copy(alpha = 0.6f)
+                                 )
+                              )
+                           }
+                           innerTextField()
+                        }
+                     }
+                  })
+            }
+
+            items(categories) { category ->
+               FilterChip(selected = selectedCategory == category.name, onClick = {
+                  focusManager.clearFocus()
+                  selectedCategory = category.name
+               }, label = { Text("${category.icon} ${category.name}") })
+            }
+         }
+         LazyVerticalGrid(
+            modifier = Modifier
+               .height(300.dp)
+               .clickable(
+                  interactionSource = remember { MutableInteractionSource() }, indication = null
+               ) {
+                  focusManager.clearFocus()
+               },
+            columns = GridCells.Adaptive(56.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+         ) {
+
+            items(
+               filteredEmojis,
+               key = { it.emoji + it.keywords.joinToString() },
+            ) { emoji ->
+
+               FilledTonalIconButton(
+                  onClick = {
+                     onEmojiSelected(emoji.emoji)
+                     onCloseSheet()
+                  }) {
+                  Text(
+                     emoji.emoji, fontSize = 24.sp
+                  )
+               }
+            }
          }
       }
    }
 }
 
 @Composable
-fun HabitItemScreen(habit: HabitUiState) {
-   Scaffold(
+fun HabitItemRoute(
+   habitId: Int,
+   startBounds: Rect,
+   expanded: Boolean,
+   onBack: () -> Unit,
+   onAnimationFinished: () -> Unit,
+   onSelectHabit: (Int, Rect) -> Unit,
+) {
+   // 1. THE GATE: If idle, completely remove this from the composition
+
+   val density = LocalDensity.current
+   val screen = LocalConfiguration.current
+
+   // Convert screen dimensions to pixels for the target Rect
+   val screenWidthPx = with(density) { screen.screenWidthDp.dp.toPx() }
+   val screenHeightPx = with(density) { screen.screenHeightDp.dp.toPx() }
+
+   // 2. STATE MACHINE
+   val currentState = if (expanded) CardState.EXPANDED else CardState.COMPACT
+   val transition = updateTransition(targetState = currentState, label = "card_morph")
+
+   // 3. GEOMETRY ANIMATIONS
+   val bounds by transition.animateRect(
+      transitionSpec = { spring(dampingRatio = 0.8f, stiffness = 300f) },
+      label = "bounds"
+   ) { state ->
+      Log.d("TAGG", "${state.toString()}  ${startBounds.topLeft} ${startBounds.bottomRight}")
+      if (state == CardState.EXPANDED) {
+         Rect(0f, 0f, screenWidthPx, screenHeightPx)
+      } else {
+         startBounds
+      }
+   }
+
+   val corner by transition.animateDp(
+      transitionSpec = { tween(300) },
+      label = "corner"
+   ) { state -> if (state == CardState.EXPANDED) 0.dp else 20.dp }
+
+   val color by transition.animateColor(
+      transitionSpec = { tween(300) },
+      label = "color"
+   ) {
+         state -> if (state == CardState.EXPANDED) MaterialTheme.colorScheme.surface else Color.White.copy(alpha = 0.2f)
+
+}
+   // 4. CLEANUP SIGNAL
+   LaunchedEffect(transition.currentState, transition.targetState) {
+      if (transition.currentState == CardState.COMPACT && transition.targetState == CardState.COMPACT) {
+         onAnimationFinished() // Resets habitId to -1
+      }
+   }
+
+
+      if (habitId == -1) return
+   // 6. THE UNIFIED CONTAINER
+   Box(
       modifier = Modifier
-         .fillMaxSize()
-         .background(Color.Transparent)
-   ) { innerPadding ->
-      innerPadding
-//      TextField()
+         // Convert pixel coordinates back to safe Dp for sizing
+         .size(
+            width = with(density) { bounds.width.toDp() },
+            height = with(density) { bounds.height.toDp() }
+         )
+         .offset { IntOffset(bounds.left.toInt(), bounds.top.toInt()) }
+         .clip(RoundedCornerShape(corner))
+         .background(MaterialTheme.colorScheme.surface) // Prevents list from bleeding through during crossfade
+   ) {
+      // 7. THE CROSSFADE (Powered by the same transition)
+      transition.AnimatedContent(
+         transitionSpec = {
+            fadeIn(tween(200)) togetherWith fadeOut(tween(200))
+         },
+         contentKey = { it } // Keys the content to the CardState
+      ) { state ->
+         // 5. DATA LAYER (Safe to run because habitId != -1)
+         val detailViewModel: HabitDetailViewModel = hiltViewModel()
+         val uiState by detailViewModel.uiState.collectAsStateWithLifecycle()
+
+         LaunchedEffect(habitId) {
+            detailViewModel.loadHabit(habitId)
+         }
+
+         if (state == CardState.COMPACT) {
+            // The "Ghost" Row that exactly matches the list item
+            HabitRow(
+               habitName = uiState.name,
+               isToggled = uiState.isDoneToday,
+               emoji = uiState.emoji,
+               onClickHabit = {bounds -> onSelectHabit(uiState.id, bounds)},
+               modifier = Modifier
+            )
+         } else {
+            // The Real Details Screen
+            HabitItemScreen(
+               habit = uiState,
+               onNameChange = detailViewModel::onNameChanged,
+               onEmojiChange = detailViewModel::onEmojiChanged,
+               onSave = detailViewModel::saveHabit,
+               onBack = onBack,
+               modifier = Modifier
+            )
+         }
+      }
+   }
+}
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun HabitItemScreen(
+   habit: HabitUiState,
+   onNameChange: (String) -> Unit,
+   onEmojiChange: (String) -> Unit,
+   onSave: () -> Unit,
+   onBack: () -> Unit,
+   modifier: Modifier = Modifier
+
+) {
+   val scope = rememberCoroutineScope()
+   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+   var showEmojiPicker by remember { mutableStateOf(false) }
+   val focusManager = LocalFocusManager.current
+   var clickTriggeredSheetOpen by remember { mutableStateOf(false) }
+   val isKeyboardVisible = WindowInsets.isImeVisible
+   Column(
+      modifier
+         .background(MaterialTheme.colorScheme.surface)
+   ) {
+      HabitItemTopAppBar(
+         habit.emoji,
+         onBackPressed = onBack,
+         onEditIcon = {
+            focusManager.clearFocus()
+            showEmojiPicker = true
+
+         },
+         onSaveHabit = onSave
+      )
+
+      TextField(
+         value = habit.name,
+         onValueChange = onNameChange,
+         textStyle = MaterialTheme.typography.titleLarge,
+         placeholder = {
+            Text(
+               "Title",
+               style = MaterialTheme.typography.titleLarge,
+               color = Color.White.copy(alpha = .5f)
+            )
+         },
+         modifier = Modifier.fillMaxWidth()
+//            .focusRequester(focusRequester)
+//            .onFocusChanged { focusState ->
+//               if (focusState.isFocused && !isExpanded) {
+//                  onExpandedChange(true)
+//               }
+//            }
+         ,
+         colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+
+
+            ),
+         singleLine = true
+      )
+
+   }
+//   LaunchedEffect(isKeyboardVisible, clickTriggeredSheetOpen) {
+//         if (clickTriggeredSheetOpen && !isKeyboardVisible) {
+//            // The keyboard is officially gone! Now it's safe to open the sheet
+//            showEmojiPicker = true
+//            clickTriggeredSheetOpen = false // Reset trigger
+//         }
+//      }
+   if (showEmojiPicker) {
+
+      HabitEmojiPickerSheet(
+         sheetState = sheetState,
+         onEmojiSelected = onEmojiChange,
+         onDismissRequest = {
+            // This handles hardware back buttons or tapping outside the sheet
+            showEmojiPicker = false
+         },
+         onCloseSheet = {
+            // This lets us trigger a beautiful closing animation from inside the sheet
+            scope.launch {
+               sheetState.hide() // 1. Animate down
+            }.invokeOnCompletion {
+               if (!sheetState.isVisible) {
+                  showEmojiPicker = false // 2. Remove from UI once hidden
+               }
+            }
+         })
    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HabitMainScreen(habitViewModel: HabitViewModel) {
+private fun HabitItemTopAppBar(
+   selectedEmoji: String, onBackPressed: () -> Unit, onEditIcon: () -> Unit, onSaveHabit: () -> Unit
+
+) {
+   TopAppBar(modifier = Modifier.padding(10.dp), title = {
+      Text("Edit habit")
+   }, navigationIcon = {
+      IconButton(onClick = onBackPressed, modifier = Modifier) {
+         Icon(
+            imageVector = Icons.Outlined.ArrowBack,
+            contentDescription = stringResource(R.string.back_button),
+            modifier = Modifier.fillMaxSize(.6f)
+         )
+      }
+   }, actions = {
+      Box(
+         modifier = Modifier, contentAlignment = Alignment.Center
+
+      ) {
+         var emojiSize by remember { mutableStateOf(IntSize.Zero) }
+         val density = LocalDensity.current
+
+         val editButtonSize = remember(emojiSize, density) {
+            with(density) {
+               (emojiSize.width * 0.5f).toDp()
+            }
+         }
+         EmojiButton(
+            selectedEmoji,
+            modifier = Modifier.onSizeChanged { emojiSize = it },
+            onEditIcon,
+         )
+         IconButton(
+            modifier = Modifier
+               .size(editButtonSize)
+               .align(Alignment.BottomEnd),
+            onClick = onEditIcon,
+            colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.onPrimary)
+         ) {
+            Icon(
+               imageVector = Icons.Outlined.ModeEditOutline,
+               contentDescription = "Edit Icon",
+               modifier = Modifier
+                  .padding(3.dp)
+                  .fillMaxSize()
+            )
+         }
+
+      }
+      Spacer(Modifier.width(30.dp))
+      IconButton(onClick = {
+         onSaveHabit()
+         onBackPressed()
+      }, modifier = Modifier) {
+         Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "Save",
+            modifier = Modifier.fillMaxSize(.8f)
+         )
+      }
+   })
+}
+
+@Composable
+private fun EmojiButton(
+   selectedEmoji: String,
+   modifier: Modifier = Modifier,
+   onEditIcon: () -> Unit = {},
+) {
+   IconButton(
+      onClick = onEditIcon,
+      colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.surface),
+      modifier = Modifier
+         .then(modifier)
+   ) {
+      Text(selectedEmoji, style = MaterialTheme.typography.headlineSmall)
+   }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HabitMainScreen(
+   habitViewModel: HabitViewModel,
+   onCreateHabit: () -> Unit = {},
+   onHabitClicked: (Int) -> Unit = {}
+) {
+
    val searchQuery by habitViewModel.searchQuery.collectAsState()
    val habitUiState by habitViewModel.habitsUiState.collectAsStateWithLifecycle()
 
+   val selected by habitViewModel.selectedHabit.collectAsStateWithLifecycle()
    val habits by remember {
       derivedStateOf {
          (habitUiState as? UiState.Success)?.habits ?: emptyList()
@@ -130,13 +644,10 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
 
    var isSearchExpanded by remember { mutableStateOf(false) }
    val focusManager = LocalFocusManager.current
-   val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-   val animationDuration  = 300
-   val dynamicTopPadding by animateDpAsState(
-      targetValue = if (isSearchExpanded) statusBarHeight else 0.dp,
-      animationSpec = tween(durationMillis = animationDuration),
-      label = "StatusBarTransition"
-   )
+   val animationDuration = 3000
+
+   val showFab = (habitUiState is UiState.Success) && !isSearchExpanded
+
    BackHandler(enabled = isSearchExpanded) {
       isSearchExpanded = false
       habitViewModel.onSearchQueryChange("")
@@ -144,17 +655,38 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
    }
 
    // Leave Scaffold's topBar blank so we can dynamically control the top area ourselves
-   Scaffold { innerPadding ->
+   Scaffold(
+      floatingActionButton = {
+         if (showFab) {
+            FloatingActionButton(
+               onClick = onCreateHabit
+            ) {
+               IconButton(
+                  modifier = Modifier,
+                  onClick = onCreateHabit,
+               ) {
+                  Icon(
+                     tint = MaterialTheme.colorScheme.onPrimary,
+                     imageVector = Icons.Outlined.Add,
+                     contentDescription = "Add Icon",
+                     modifier = Modifier
+                        .padding(3.dp)
+                        .fillMaxSize()
+                  )
+               }
+            }
+         }
+      }) { innerPadding ->
       Column(
          modifier = Modifier
             .fillMaxSize()
             .padding(bottom = innerPadding.calculateBottomPadding())
-      )
-      {
+      ) {
          Column(
-            modifier = Modifier.fillMaxWidth()
-         )
-         {
+            modifier = Modifier
+               .fillMaxWidth()
+               .statusBarsPadding()
+         ) {
             AnimatedTopAppBar(isSearchExpanded, animationDuration)
 
 
@@ -165,11 +697,15 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
                onExpandedChange = { isSearchExpanded = it },
                onQueryChange = { habitViewModel.onSearchQueryChange(it) },
                modifier = Modifier
-                  .padding(top = dynamicTopPadding)
-                  .padding(horizontal = 16.dp, vertical = 8.dp)
                   .fillMaxWidth()
-            )
-            {
+                  .padding(horizontal = 16.dp, vertical = 8.dp)
+
+                  .animateContentSize(
+                     animationSpec = tween(
+                        durationMillis = animationDuration, easing = FastOutSlowInEasing
+                     )
+                  )
+            ) {
                // Dropdown search results appear right here
                if (filteredHabits.isEmpty() && searchQuery.isNotEmpty()) {
                   Text(
@@ -185,8 +721,9 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
                            modifier = Modifier
                               .fillMaxWidth()
                               .clickable {
-                                 habitViewModel.onHabitChecked(habit.id)
+                                 onHabitClicked(habit.id)
                                  isSearchExpanded = false
+                                 habitViewModel.onSearchQueryChange("")
                                  focusManager.clearFocus()
                               }
                               .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -203,21 +740,28 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
                }
             }
          }      // --- MAIN BODY CONTENT AREA BELOW THE SEARCH SECTOR ---
+
          Box(
             modifier = Modifier
                .fillMaxWidth()
                .weight(1f)
-         )
-         {
+         ) {
             // Layer 1: Regular habit elements list
             when (habitUiState) {
-               is UiState.Success -> HabitList(habits) { habitId ->
-                  habitViewModel.onHabitChecked(habitId)
+               is UiState.Success -> HabitList(
+                  habits,
+                  onToggleHabitId = { habitId ->
+                     habitViewModel.onHabitChecked(habitId)
+                  },
+               ) { habitId, bounds ->
+                  habitViewModel.selectHabit(habitId, bounds)
                }
 
                is UiState.Loading -> LoadingSpinner()
+
                is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
             }
+
 
             // Layer 2: Blackout scrim to blur/hide the list background layout when searching
             if (isSearchExpanded) {
@@ -235,25 +779,57 @@ fun HabitMainScreen(habitViewModel: HabitViewModel) {
                      })
             }
          }
+      LaunchedEffect(selected.habitId) {
+         if (selected.habitId != -1 && !selected.expanded) {
+            habitViewModel.expandSelected()
+         }
+      }
+      }
+      selected.let {
+         HabitItemRoute(
+            habitId = it.habitId,
+            startBounds = it.bounds,
+            expanded = it.expanded,
+            onBack = habitViewModel::clearSelection,
+            onSelectHabit = habitViewModel::selectHabit,
+            onAnimationFinished = habitViewModel::resetToIdle
+         )
       }
    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ColumnScope.AnimatedTopAppBar(isSearchExpanded: Boolean, animationDuration: Int) {
+private fun ColumnScope.AnimatedTopAppBar(
+   isSearchExpanded: Boolean, animationDuration: Int, measureTopAppBarHeight: (Int) -> Unit = {}
+) {
+   val density = LocalDensity.current
    AnimatedVisibility(
       visible = !isSearchExpanded,
-      enter = expandVertically() + fadeIn(
-         animationSpec = tween(
-            animationDuration
-         )
-      ),
-      exit = shrinkVertically() + fadeOut(
-         animationSpec = tween(
-            animationDuration
-         )
-      )
+      enter = fadeIn(animationSpec = tween(300, easing = LinearOutSlowInEasing)) + scaleIn(
+         initialScale = 0.92f, animationSpec = tween(300)
+      ) + expandVertically(animationSpec = tween(300, easing = LinearOutSlowInEasing)),
+      exit =
+         // 1. Visually disappear FIRST (runs from 0ms to 150ms)
+         fadeOut(
+            animationSpec = tween(
+               150, easing = FastOutLinearInEasing
+            )
+         ) + scaleOut(targetScale = 0.92f, animationSpec = tween(150)) +
+
+                 // 2. Collapse the layout SECOND (waits for 150ms, then runs for 250ms)
+                 shrinkVertically(
+                    animationSpec = tween(
+                       durationMillis = 250,
+                       delayMillis = 150, // Matches the duration of the fadeOut!
+                       easing = FastOutLinearInEasing
+                    )
+                 ),
+      modifier = Modifier.onGloballyPositioned { coordinates ->
+         val topAppBarHeightInt = with(density) { coordinates.size.height }
+         measureTopAppBarHeight(topAppBarHeightInt)
+      }
+
    ) {
       // NORMAL STATE: Render the real top app bar
       TopAppBar(
@@ -286,72 +862,96 @@ fun CustomSearchHabitBar(
    Column(
       modifier = modifier
          .animateContentSize()
-         // Dynamically flattens layout shape corners down to 0 when acting as the TopAppBar header
-         .clip(RoundedCornerShape(28.dp))
-         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+         .background(Color.Transparent)
+      // Dynamically flattens layout shape corners down to 0 when acting as the TopAppBar header
    ) {
       Row(
-         modifier = Modifier
+         Modifier
             .fillMaxWidth()
             .padding(horizontal = 4.dp, vertical = 6.dp),
          verticalAlignment = Alignment.CenterVertically
       ) {
-         if (isExpanded) {
-            IconButton(onClick = {
-               onExpandedChange(false)
-               onQueryChange("")
-               focusManager.clearFocus()
-            }) {
+         Row(
+            modifier = Modifier
+               .padding(end = 10.dp)
+               .weight(1f)
+               .clip(RoundedCornerShape(28.dp))
+               .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            verticalAlignment = Alignment.CenterVertically
+
+         ) {
+            if (isExpanded) {
+               IconButton(onClick = {
+                  onExpandedChange(false)
+                  onQueryChange("")
+                  focusManager.clearFocus()
+               }) {
+                  Icon(
+                     imageVector = Icons.Default.ArrowBackIosNew,
+                     contentDescription = "Back",
+                     tint = MaterialTheme.colorScheme.onSurface
+                  )
+               }
+            } else {
                Icon(
-                  imageVector = Icons.Default.ArrowBackIosNew,
-                  contentDescription = "Back",
-                  tint = MaterialTheme.colorScheme.onSurface
+                  imageVector = Icons.Default.Search,
+                  contentDescription = "Search",
+                  modifier = Modifier.padding(start = 16.dp, end = 8.dp),
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant
                )
             }
-         } else {
-            Icon(
-               imageVector = Icons.Default.Search,
-               contentDescription = "Search",
-               modifier = Modifier.padding(start = 16.dp, end = 8.dp),
-               tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-         }
 
-         TextField(
-            value = query,
-            onValueChange = {
-               onQueryChange(it)
-               if (!isExpanded && it.isNotEmpty()) {
-                  onExpandedChange(true)
-               }
-            },
-            placeholder = { Text("Search habits...") },
-            modifier = Modifier
-               .weight(1f)
-               .focusRequester(focusRequester)
-               .onFocusChanged { focusState ->
-                  if (focusState.isFocused && !isExpanded) {
+            TextField(
+               value = query,
+               onValueChange = {
+                  onQueryChange(it)
+                  if (!isExpanded && it.isNotEmpty()) {
                      onExpandedChange(true)
                   }
                },
-            colors = TextFieldDefaults.colors(
-               focusedContainerColor = Color.Transparent,
-               unfocusedContainerColor = Color.Transparent,
-               disabledContainerColor = Color.Transparent,
-               focusedIndicatorColor = Color.Transparent,
-               unfocusedIndicatorColor = Color.Transparent,
+               placeholder = { Text("Search habits...") },
+               modifier = Modifier
+                  .weight(1f)
+                  .focusRequester(focusRequester)
+                  .onFocusChanged { focusState ->
+                     if (focusState.isFocused && !isExpanded) {
+                        onExpandedChange(true)
+                     }
+                  },
+               colors = TextFieldDefaults.colors(
+                  focusedContainerColor = Color.Transparent,
+                  unfocusedContainerColor = Color.Transparent,
+                  disabledContainerColor = Color.Transparent,
+                  focusedIndicatorColor = Color.Transparent,
+                  unfocusedIndicatorColor = Color.Transparent,
 
-               ),
-            singleLine = true
-         )
+                  ),
+               singleLine = true
+            )
+         }
+         AnimatedVisibility(
+            visible = isExpanded,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally()
+         ) {
+            TextButton(onClick = {
+               onExpandedChange(false)
+               onQueryChange("")
+               focusManager.clearFocus()
+            }) { Text("Cancel", color = MaterialTheme.colorScheme.primary) }
+         }
       }
-
       if (isExpanded && query.isNotEmpty()) {
-         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+//         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
          Column(
             modifier = Modifier
                .fillMaxWidth()
-               .heightIn(max = 400.dp) // The dropdown menu results expansion boundaries
+               .clip(RoundedCornerShape(15.dp))
+               .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = .5f))
+               .wrapContentHeight()
+//               .heightIn(max = 900.dp) // The dropdown menu results expansion boundaries
+
+
          ) {
             content()
          }
@@ -374,11 +974,11 @@ fun LoadingSpinner() {
 
 }
 
-@Preview(showBackground = true)
-@Composable
-fun SearchHabitBarPreview() {
-//   SearchHabitBar("") { }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun SearchHabitBarPreview() {
+////   SearchHabitBar("") { }
+//}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -418,19 +1018,30 @@ fun SearchHabitBar(
 }
 
 @Composable
-fun HabitList(habitList: List<HabitUiState>, onToggleHabitId: (habitId: Int) -> Unit) {
+fun HabitList(
+   habitList: List<HabitUiState>,
+   onToggleHabitId: (habitId: Int) -> Unit,
+   onHabitItemClick: (habitId: Int, bounds: Rect) -> Unit = { _, _ -> }
+) {
    val hazeState = rememberHazeState()
+
+
+
    LazyColumn(
-      modifier = Modifier.hazeSource(state = hazeState)
    ) {
       items(habitList, key = { habit -> habit.id }) { habit ->
-         HabitRow(
-            habitName = habit.name,
-            isToggled = habit.isDoneToday,
-            iconName = habit.iconName,
-            hazeState = hazeState,
-            onToggle = { onToggleHabitId(habit.id) })
+         Surface(
+            Modifier
+         ) {
+            Log.d("Tag", "prove that it works ${habit.id}")
+            HabitRow(
+               habitName = habit.name,
+               isToggled = habit.isDoneToday,
+               emoji = habit.emoji,
+               onToggle = { onToggleHabitId(habit.id) },
+            ) { bounds -> onHabitItemClick(habit.id, bounds) }
 
+         }
       }
 
    }
@@ -441,36 +1052,38 @@ fun HabitList(habitList: List<HabitUiState>, onToggleHabitId: (habitId: Int) -> 
 fun HabitRow(
    habitName: String,
    isToggled: Boolean,
-   iconName: String,
-   hazeState: HazeState,
-   onToggle: () -> Unit
+   emoji: String,
+//   hazeState: HazeState,
+   onToggle: () -> Unit = {},
+   modifier: Modifier = Modifier,
+   onClickHabit: (Rect) -> Unit = {}
 ) {
+   var bounds by remember { mutableStateOf<Rect?>(null) }
    Row(
       modifier = Modifier
-         .padding(8.dp)
          .fillMaxWidth()
-         .hazeEffect(state = hazeState) {
-            blurEffect {
-               blurRadius = 20.dp
-               colorEffects = listOf(HazeColorEffect.tint(Color.Black.copy(alpha = 0.5f)))
-            }
+//         .hazeEffect(state = hazeState) {
+//            blurEffect {
+//               blurRadius = 20.dp
+//               colorEffects = listOf(HazeColorEffect.tint(Color.Black.copy(alpha = 0.5f)))
+//            }
+//         }
+         .onGloballyPositioned { coords ->
+            bounds = coords.boundsInRoot()
          }
+         .padding(8.dp)
          .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
          .clip(RoundedCornerShape(20.dp))
+         .clickable { bounds?.let { onClickHabit(it) } }
+         .then(modifier)
          .padding(16.dp),
       verticalAlignment = Alignment.CenterVertically) {
-      IconButton(onClick = {}) {
-         Icon(
-            imageVector = Icons.Default.Bolt,
-            contentDescription = "iconName",
-//            modifier = Modifier.fillMaxHeight(1f)
-         )
-      }
-
+      EmojiButton(selectedEmoji = emoji)
+      Spacer(modifier = Modifier.weight(.1f))
       Text(
          text = habitName, style = MaterialTheme.typography.titleMedium
       )
-      Spacer(modifier = Modifier.weight(1f))
+      Spacer(modifier = Modifier.weight(.9f))
       IconButton(onClick = onToggle) {
          if (isToggled) {
             Icon(
@@ -497,4 +1110,3 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
       text = "Hello $name!", modifier = modifier
    )
 }
-

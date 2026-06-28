@@ -4,10 +4,6 @@ import android.learn.habitapp.data.local.HabitDao
 import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.local.HabitLogsEntity
 import android.learn.habitapp.data.local.HabitWithLogs
-import dagger.Binds
-import dagger.Module
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
@@ -19,7 +15,11 @@ interface HabitRepository {
 
    suspend fun deleteHabit(habitId: Int)
 
-   fun getHabitWithLogs(): Flow<List<HabitWithLogs>>
+    suspend fun load(habitId: Int): HabitEntity
+
+   fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>
+
+   fun loadHabitWithLogs(habitId: Int): Flow<HabitWithLogs>
 
 
 }
@@ -43,9 +43,17 @@ class HabitRepositoryImpl @Inject constructor (
       habitDao.deleteHabit(habitId)
    }
 
+   override suspend fun load(habitId: Int): HabitEntity {
+     return habitDao.loadHabit(habitId)
+   }
 
-   override fun getHabitWithLogs(): Flow<List<HabitWithLogs>> {
+
+   override fun getHabitsWithLogs(): Flow<List<HabitWithLogs>> {
       return habitDao.getHabitsWithLogs()
+   }
+
+   override fun loadHabitWithLogs(habitId: Int): Flow<HabitWithLogs> {
+      return habitDao.loadHabitWithLogs(habitId)
    }
 
 }

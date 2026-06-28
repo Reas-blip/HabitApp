@@ -1,6 +1,9 @@
 package android.learn.habitapp.ui.theme
 
 import android.os.Build
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -8,6 +11,8 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
@@ -48,10 +53,19 @@ fun HabitAppTheme(
       darkTheme -> DarkColorScheme
       else -> LightColorScheme
    }
+   @OptIn(ExperimentalSharedTransitionApi::class)
+   val CustomSpringTransformSpec = BoundsTransform { _, _ ->
+      spring(
+         dampingRatio = 0.78f, // Controls the bounce (under 1.0f gives a slight elastic kick)
+         stiffness = 450f      // Controls how fast the container accelerates to full size
+      )
+   }
+   val LocalTransformSpec = compositionLocalOf { CustomSpringTransformSpec }
 
+   CompositionLocalProvider(LocalTransformSpec provides CustomSpringTransformSpec) {
    MaterialTheme(
       colorScheme = colorScheme,
       typography = Typography,
       content = content
-   )
+   )}
 }

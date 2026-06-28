@@ -19,11 +19,18 @@ interface HabitDao {
    @Query("DELETE FROM habit_logs WHERE habitId = :habitId AND date = :date")
    fun deleteHabitLog(habitId: Int, date: Long)
 
-   @Delete
+   @Insert(onConflict = OnConflictStrategy.REPLACE)
    fun insertHabitLog(habitLog: HabitLogsEntity)
 
    @Transaction
    @Query("SELECT * from habits")
    fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>
+
+   @Transaction
+   @Query("SELECT * from habits where id =:habitId")
+   fun loadHabitWithLogs(habitId: Int): Flow<HabitWithLogs>
+
+   @Query("SELECT * from habits WHERE id = :habitId")
+   fun loadHabit(habitId: Int): HabitEntity
 
 }
