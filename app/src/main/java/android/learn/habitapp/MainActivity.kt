@@ -1,13 +1,17 @@
 package android.learn.habitapp
 
-import android.annotation.SuppressLint
 import android.learn.habitapp.data.emoji.HabitEmoji
 import android.learn.habitapp.data.emoji.HabitEmojiData
 import android.learn.habitapp.data.repository.HabitEmojiRepository
-import android.learn.habitapp.ui.CardState
+import android.learn.habitapp.navigation.HabitDetail
+import android.learn.habitapp.navigation.HabitList
+import android.learn.habitapp.navigation.HabitSharedElementType
+import android.learn.habitapp.navigation.LocalAnimatedVisibilityScope
+import android.learn.habitapp.navigation.animatedComposable
 import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
 import android.learn.habitapp.ui.theme.HabitAppTheme
+import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -15,19 +19,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColor
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
-import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateRect
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -36,7 +37,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,7 +53,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -114,10 +113,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -128,14 +125,17 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import dagger.hilt.android.AndroidEntryPoint
+import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 
@@ -152,13 +152,52 @@ class MainActivity : ComponentActivity() {
          val coroutineScope = rememberCoroutineScope()
          val navController = rememberNavController()
          HabitAppTheme {
-            HabitMainScreen(habitViewModel) { }
+
+            val viewModel: HabitDetailViewModel = hiltViewModel()
+            NavHost(
+               navController = navController,
+               startDestination = HabitList,
+
+               ) {
+
+               animatedComposable<HabitList> {
+
+                  HabitMainScreen(
+                     habitViewModel = habitViewModel,
+                     onCreateHabit = { navController.navigate(HabitDetail()) }) { habitId ->
+                     viewModel.loadHabit(habitId)
+                     navController.navigate(HabitDetail(habitId))
+                  }
+               }
+
+               animatedComposable<HabitDetail> { backStackEntry ->
+
+                  val detailArgs = backStackEntry.toRoute<HabitDetail>()
+
+
+                  HabitItemRoute(
+                     viewModel = viewModel,
+                     habitId = detailArgs.habitId ?: -1,
+                  ) { navController.popBackStack() }
+               }
+            }
          }
       }
    }
 }
 
-
+@Preview()
+@Composable
+private fun HabitItemScreenPreview() {
+//   SharedTransitionLayout { HabitItemScreen(
+//      HabitUiState(1, "Testing", "Test", true),
+//      this@SharedTransitionLayout,
+//      this,
+//      onNameChange = { },
+//      onEmojiChange = {},
+//      onSave = {}
+//   ) {} }
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -339,110 +378,32 @@ fun HabitEmojiPickerSheet(
 
 @Composable
 fun HabitItemRoute(
+   viewModel: HabitDetailViewModel,
    habitId: Int,
-   startBounds: Rect,
-   expanded: Boolean,
    onBack: () -> Unit,
-   onAnimationFinished: () -> Unit,
-   onSelectHabit: (Int, Rect) -> Unit,
 ) {
-   // 1. THE GATE: If idle, completely remove this from the composition
+   val uiState by viewModel.uiState.collectAsState()
 
-   val density = LocalDensity.current
-   val screen = LocalConfiguration.current
 
-   // Convert screen dimensions to pixels for the target Rect
-   val screenWidthPx = with(density) { screen.screenWidthDp.dp.toPx() }
-   val screenHeightPx = with(density) { screen.screenHeightDp.dp.toPx() }
+   Surface(
+      Modifier.fillMaxSize()
+   ) {
+      Log.d("Tag", "wonder if it will work$habitId")
 
-   // 2. STATE MACHINE
-   val currentState = if (expanded) CardState.EXPANDED else CardState.COMPACT
-   val transition = updateTransition(targetState = currentState, label = "card_morph")
+      HabitItemScreen(
+         uiState,
+         onNameChange = viewModel::onNameChanged,
+         onEmojiChange = viewModel::onEmojiChanged,
+         onSave = viewModel::saveHabit,
+         onBack = onBack,
+         modifier = Modifier
 
-   // 3. GEOMETRY ANIMATIONS
-   val bounds by transition.animateRect(
-      transitionSpec = { spring(dampingRatio = 0.8f, stiffness = 300f) },
-      label = "bounds"
-   ) { state ->
-      Log.d("TAGG", "${state.toString()}  ${startBounds.topLeft} ${startBounds.bottomRight}")
-      if (state == CardState.EXPANDED) {
-         Rect(0f, 0f, screenWidthPx, screenHeightPx)
-      } else {
-         startBounds
-      }
+      )
    }
 
-   val corner by transition.animateDp(
-      transitionSpec = { tween(300) },
-      label = "corner"
-   ) { state -> if (state == CardState.EXPANDED) 0.dp else 20.dp }
-
-   val color by transition.animateColor(
-      transitionSpec = { tween(300) },
-      label = "color"
-   ) {
-         state -> if (state == CardState.EXPANDED) MaterialTheme.colorScheme.surface else Color.White.copy(alpha = 0.2f)
 
 }
-   // 4. CLEANUP SIGNAL
-   LaunchedEffect(transition.currentState, transition.targetState) {
-      if (transition.currentState == CardState.COMPACT && transition.targetState == CardState.COMPACT) {
-         onAnimationFinished() // Resets habitId to -1
-      }
-   }
 
-
-      if (habitId == -1) return
-   // 6. THE UNIFIED CONTAINER
-   Box(
-      modifier = Modifier
-         // Convert pixel coordinates back to safe Dp for sizing
-         .size(
-            width = with(density) { bounds.width.toDp() },
-            height = with(density) { bounds.height.toDp() }
-         )
-         .offset { IntOffset(bounds.left.toInt(), bounds.top.toInt()) }
-         .clip(RoundedCornerShape(corner))
-         .background(MaterialTheme.colorScheme.surface) // Prevents list from bleeding through during crossfade
-   ) {
-      // 7. THE CROSSFADE (Powered by the same transition)
-      transition.AnimatedContent(
-         transitionSpec = {
-            fadeIn(tween(200)) togetherWith fadeOut(tween(200))
-         },
-         contentKey = { it } // Keys the content to the CardState
-      ) { state ->
-         // 5. DATA LAYER (Safe to run because habitId != -1)
-         val detailViewModel: HabitDetailViewModel = hiltViewModel()
-         val uiState by detailViewModel.uiState.collectAsStateWithLifecycle()
-
-         LaunchedEffect(habitId) {
-            detailViewModel.loadHabit(habitId)
-         }
-
-         if (state == CardState.COMPACT) {
-            // The "Ghost" Row that exactly matches the list item
-            HabitRow(
-               habitName = uiState.name,
-               isToggled = uiState.isDoneToday,
-               emoji = uiState.emoji,
-               onClickHabit = {bounds -> onSelectHabit(uiState.id, bounds)},
-               modifier = Modifier
-            )
-         } else {
-            // The Real Details Screen
-            HabitItemScreen(
-               habit = uiState,
-               onNameChange = detailViewModel::onNameChanged,
-               onEmojiChange = detailViewModel::onEmojiChanged,
-               onSave = detailViewModel::saveHabit,
-               onBack = onBack,
-               modifier = Modifier
-            )
-         }
-      }
-   }
-}
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HabitItemScreen(
@@ -460,51 +421,62 @@ fun HabitItemScreen(
    val focusManager = LocalFocusManager.current
    var clickTriggeredSheetOpen by remember { mutableStateOf(false) }
    val isKeyboardVisible = WindowInsets.isImeVisible
-   Column(
-      modifier
-         .background(MaterialTheme.colorScheme.surface)
-   ) {
-      HabitItemTopAppBar(
-         habit.emoji,
-         onBackPressed = onBack,
-         onEditIcon = {
-            focusManager.clearFocus()
-            showEmojiPicker = true
 
-         },
-         onSaveHabit = onSave
-      )
-
-      TextField(
-         value = habit.name,
-         onValueChange = onNameChange,
-         textStyle = MaterialTheme.typography.titleLarge,
-         placeholder = {
-            Text(
-               "Title",
-               style = MaterialTheme.typography.titleLarge,
-               color = Color.White.copy(alpha = .5f)
+   with(LocalSharedTransitionScope.current) {
+      Column(
+         Modifier
+            .sharedBounds(
+               sharedContentState = rememberSharedContentState(
+                  key = HabitSharedElementType.Bounds(
+                     habit.id
+                  )
+               ),
+               animatedVisibilityScope = LocalAnimatedVisibilityScope.current
             )
-         },
-         modifier = Modifier.fillMaxWidth()
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+      ) {
+         HabitItemTopAppBar(
+            habit.id,
+            habit.emoji, onBackPressed = onBack, onEditIcon = {
+               focusManager.clearFocus()
+               showEmojiPicker = true
+
+            }, onSaveHabit = onSave
+         )
+
+         TextField(
+            value = habit.name,
+            onValueChange = onNameChange,
+            textStyle = MaterialTheme.typography.titleLarge,
+            placeholder = {
+               Text(
+                  "Title",
+                  style = MaterialTheme.typography.titleLarge,
+                  color = Color.White.copy(alpha = .5f)
+               )
+            },
+            modifier = Modifier.fillMaxWidth()
 //            .focusRequester(focusRequester)
 //            .onFocusChanged { focusState ->
 //               if (focusState.isFocused && !isExpanded) {
 //                  onExpandedChange(true)
 //               }
 //            }
-         ,
-         colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
+            ,
+            colors = TextFieldDefaults.colors(
+               focusedContainerColor = Color.Transparent,
+               unfocusedContainerColor = Color.Transparent,
+               disabledContainerColor = Color.Transparent,
+               focusedIndicatorColor = Color.Transparent,
+               unfocusedIndicatorColor = Color.Transparent,
 
 
-            ),
-         singleLine = true
-      )
+               ),
+            singleLine = true
+         )
+
+      }
 
    }
 //   LaunchedEffect(isKeyboardVisible, clickTriggeredSheetOpen) {
@@ -539,66 +511,78 @@ fun HabitItemScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HabitItemTopAppBar(
-   selectedEmoji: String, onBackPressed: () -> Unit, onEditIcon: () -> Unit, onSaveHabit: () -> Unit
+   habitId: Int,
+   selectedEmoji: String,
+   onBackPressed: () -> Unit,
+   onEditIcon: () -> Unit,
+   onSaveHabit: () -> Unit
 
 ) {
-   TopAppBar(modifier = Modifier.padding(10.dp), title = {
-      Text("Edit habit")
-   }, navigationIcon = {
-      IconButton(onClick = onBackPressed, modifier = Modifier) {
-         Icon(
-            imageVector = Icons.Outlined.ArrowBack,
-            contentDescription = stringResource(R.string.back_button),
-            modifier = Modifier.fillMaxSize(.6f)
-         )
-      }
-   }, actions = {
-      Box(
-         modifier = Modifier, contentAlignment = Alignment.Center
 
-      ) {
-         var emojiSize by remember { mutableStateOf(IntSize.Zero) }
-         val density = LocalDensity.current
-
-         val editButtonSize = remember(emojiSize, density) {
-            with(density) {
-               (emojiSize.width * 0.5f).toDp()
-            }
-         }
-         EmojiButton(
-            selectedEmoji,
-            modifier = Modifier.onSizeChanged { emojiSize = it },
-            onEditIcon,
-         )
-         IconButton(
-            modifier = Modifier
-               .size(editButtonSize)
-               .align(Alignment.BottomEnd),
-            onClick = onEditIcon,
-            colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.onPrimary)
-         ) {
+   with(LocalSharedTransitionScope.current) {
+      TopAppBar(modifier = Modifier.padding(10.dp), title = {
+         Text("Edit habit")
+      }, navigationIcon = {
+         IconButton(onClick = onBackPressed, modifier = Modifier) {
             Icon(
-               imageVector = Icons.Outlined.ModeEditOutline,
-               contentDescription = "Edit Icon",
-               modifier = Modifier
-                  .padding(3.dp)
-                  .fillMaxSize()
+               imageVector = Icons.Outlined.ArrowBack,
+               contentDescription = stringResource(R.string.back_button),
+               modifier = Modifier.fillMaxSize(.6f)
             )
          }
+      }, actions = {
+         Box(
+            modifier = Modifier, contentAlignment = Alignment.Center
 
-      }
-      Spacer(Modifier.width(30.dp))
-      IconButton(onClick = {
-         onSaveHabit()
-         onBackPressed()
-      }, modifier = Modifier) {
-         Icon(
-            imageVector = Icons.Default.Check,
-            contentDescription = "Save",
-            modifier = Modifier.fillMaxSize(.8f)
-         )
-      }
-   })
+         ) {
+            var emojiSize by remember { mutableStateOf(IntSize.Zero) }
+            val density = LocalDensity.current
+
+            val editButtonSize = remember(emojiSize, density) {
+               with(density) {
+                  (emojiSize.width * 0.5f).toDp()
+               }
+            }
+            EmojiButton(
+               selectedEmoji,
+               modifier = Modifier
+                  .onSizeChanged { emojiSize = it }
+                  .sharedElement(
+                     rememberSharedContentState(key = HabitSharedElementType.Emoji(habitId)),
+                     animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+                  ),
+               onEditIcon,
+            )
+            IconButton(
+               modifier = Modifier
+                  .size(editButtonSize)
+                  .align(Alignment.BottomEnd),
+               onClick = onEditIcon,
+               colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.onPrimary)
+            ) {
+               Icon(
+                  imageVector = Icons.Outlined.ModeEditOutline,
+                  contentDescription = "Edit Icon",
+                  modifier = Modifier
+                     .padding(3.dp)
+                     .fillMaxSize()
+               )
+            }
+
+         }
+         Spacer(Modifier.width(30.dp))
+         IconButton(onClick = {
+            onSaveHabit()
+            onBackPressed()
+         }, modifier = Modifier) {
+            Icon(
+               imageVector = Icons.Default.Check,
+               contentDescription = "Save",
+               modifier = Modifier.fillMaxSize(.8f)
+            )
+         }
+      })
+   }
 }
 
 @Composable
@@ -610,8 +594,7 @@ private fun EmojiButton(
    IconButton(
       onClick = onEditIcon,
       colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.surface),
-      modifier = Modifier
-         .then(modifier)
+      modifier = Modifier.then(modifier)
    ) {
       Text(selectedEmoji, style = MaterialTheme.typography.headlineSmall)
    }
@@ -620,15 +603,12 @@ private fun EmojiButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitMainScreen(
-   habitViewModel: HabitViewModel,
-   onCreateHabit: () -> Unit = {},
-   onHabitClicked: (Int) -> Unit = {}
+   habitViewModel: HabitViewModel, onCreateHabit: () -> Unit, onHabitClicked: (Int) -> Unit
 ) {
 
    val searchQuery by habitViewModel.searchQuery.collectAsState()
    val habitUiState by habitViewModel.habitsUiState.collectAsStateWithLifecycle()
 
-   val selected by habitViewModel.selectedHabit.collectAsStateWithLifecycle()
    val habits by remember {
       derivedStateOf {
          (habitUiState as? UiState.Success)?.habits ?: emptyList()
@@ -740,7 +720,6 @@ fun HabitMainScreen(
                }
             }
          }      // --- MAIN BODY CONTENT AREA BELOW THE SEARCH SECTOR ---
-
          Box(
             modifier = Modifier
                .fillMaxWidth()
@@ -749,19 +728,18 @@ fun HabitMainScreen(
             // Layer 1: Regular habit elements list
             when (habitUiState) {
                is UiState.Success -> HabitList(
-                  habits,
-                  onToggleHabitId = { habitId ->
+                  habits, onToggleHabitId = { habitId ->
                      habitViewModel.onHabitChecked(habitId)
-                  },
-               ) { habitId, bounds ->
-                  habitViewModel.selectHabit(habitId, bounds)
+                  }) { habitId ->
+                  onHabitClicked(
+                     habitId
+                  )
                }
 
                is UiState.Loading -> LoadingSpinner()
 
                is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
             }
-
 
             // Layer 2: Blackout scrim to blur/hide the list background layout when searching
             if (isSearchExpanded) {
@@ -779,21 +757,6 @@ fun HabitMainScreen(
                      })
             }
          }
-      LaunchedEffect(selected.habitId) {
-         if (selected.habitId != -1 && !selected.expanded) {
-            habitViewModel.expandSelected()
-         }
-      }
-      }
-      selected.let {
-         HabitItemRoute(
-            habitId = it.habitId,
-            startBounds = it.bounds,
-            expanded = it.expanded,
-            onBack = habitViewModel::clearSelection,
-            onSelectHabit = habitViewModel::selectHabit,
-            onAnimationFinished = habitViewModel::resetToIdle
-         )
       }
    }
 }
@@ -1021,25 +984,38 @@ fun SearchHabitBar(
 fun HabitList(
    habitList: List<HabitUiState>,
    onToggleHabitId: (habitId: Int) -> Unit,
-   onHabitItemClick: (habitId: Int, bounds: Rect) -> Unit = { _, _ -> }
+   onHabitItemClick: (Int) -> Unit = {}
 ) {
    val hazeState = rememberHazeState()
-
-
 
    LazyColumn(
    ) {
       items(habitList, key = { habit -> habit.id }) { habit ->
-         Surface(
-            Modifier
-         ) {
-            Log.d("Tag", "prove that it works ${habit.id}")
-            HabitRow(
-               habitName = habit.name,
-               isToggled = habit.isDoneToday,
-               emoji = habit.emoji,
-               onToggle = { onToggleHabitId(habit.id) },
-            ) { bounds -> onHabitItemClick(habit.id, bounds) }
+         with(LocalSharedTransitionScope.current) {
+            Surface(
+               Modifier
+            ) {
+               Log.d("Tag", "prove that it works ${habit.id}")
+               HabitRow(
+                  habitId = habit.id,
+                  habitName = habit.name,
+                  isToggled = habit.isDoneToday,
+                  emoji = habit.emoji,
+//                  hazeState = hazeState,
+                  onToggle = { onToggleHabitId(habit.id) },
+                  onClickHabit = { onHabitItemClick(habit.id) },
+                  modifier = Modifier.sharedBounds(
+                     sharedContentState = rememberSharedContentState(
+                        key = HabitSharedElementType.Bounds(
+                           habit.id
+                        )
+                     ),
+                     animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+
+                  ),
+               )
+
+            }
 
          }
       }
@@ -1050,57 +1026,62 @@ fun HabitList(
 
 @Composable
 fun HabitRow(
+   habitId: Int,
    habitName: String,
    isToggled: Boolean,
    emoji: String,
 //   hazeState: HazeState,
    onToggle: () -> Unit = {},
    modifier: Modifier = Modifier,
-   onClickHabit: (Rect) -> Unit = {}
+   onClickHabit: () -> Unit = {},
 ) {
-   var bounds by remember { mutableStateOf<Rect?>(null) }
-   Row(
-      modifier = Modifier
-         .fillMaxWidth()
+   with(LocalSharedTransitionScope.current) {
+      Row(
+         modifier = Modifier
+            .padding(8.dp)
+            .fillMaxWidth()
+            .then(modifier)
+            .clickable { onClickHabit() }
 //         .hazeEffect(state = hazeState) {
 //            blurEffect {
 //               blurRadius = 20.dp
 //               colorEffects = listOf(HazeColorEffect.tint(Color.Black.copy(alpha = 0.5f)))
 //            }
 //         }
-         .onGloballyPositioned { coords ->
-            bounds = coords.boundsInRoot()
-         }
-         .padding(8.dp)
-         .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
-         .clip(RoundedCornerShape(20.dp))
-         .clickable { bounds?.let { onClickHabit(it) } }
-         .then(modifier)
-         .padding(16.dp),
-      verticalAlignment = Alignment.CenterVertically) {
-      EmojiButton(selectedEmoji = emoji)
-      Spacer(modifier = Modifier.weight(.1f))
-      Text(
-         text = habitName, style = MaterialTheme.typography.titleMedium
-      )
-      Spacer(modifier = Modifier.weight(.9f))
-      IconButton(onClick = onToggle) {
-         if (isToggled) {
-            Icon(
-               imageVector = Icons.Filled.CheckCircle,
-               contentDescription = "Task Completed",
-               tint = Color(0xFF4CAF50) // Material Green
+            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .padding(16.dp),
+         verticalAlignment = Alignment.CenterVertically) {
+         EmojiButton(
+            selectedEmoji = emoji,
+            modifier = Modifier.sharedElement(
+               rememberSharedContentState(key = HabitSharedElementType.Emoji(habitId)),
+               animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
             )
-         } else {
-            Icon(
-               imageVector = Icons.Outlined.Circle,
-               contentDescription = "Mark as Complete",
-               tint = Color.Gray
-            )
+         )
+         Spacer(modifier = Modifier.weight(.1f))
+         Text(
+            text = habitName, style = MaterialTheme.typography.titleMedium
+         )
+         Spacer(modifier = Modifier.weight(.9f))
+         IconButton(onClick = onToggle) {
+            if (isToggled) {
+               Icon(
+                  imageVector = Icons.Filled.CheckCircle,
+                  contentDescription = "Task Completed",
+                  tint = Color(0xFF4CAF50) // Material Green
+               )
+            } else {
+               Icon(
+                  imageVector = Icons.Outlined.Circle,
+                  contentDescription = "Mark as Complete",
+                  tint = Color.Gray
+               )
+            }
          }
+
+
       }
-
-
    }
 }
 

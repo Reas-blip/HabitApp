@@ -2,6 +2,7 @@ package android.learn.habitapp
 
 import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.repository.HabitRepository
+import android.learn.habitapp.navigation.HabitDetail
 import android.learn.habitapp.ui.HabitUiState
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel

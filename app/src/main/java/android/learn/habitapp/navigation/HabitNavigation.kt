@@ -1,4 +1,4 @@
-package android.learn.habitapp
+package android.learn.habitapp.navigation
 import kotlinx.serialization.Serializable
 
 @Serializable

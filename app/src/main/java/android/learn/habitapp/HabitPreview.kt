@@ -105,6 +105,7 @@ fun HabitAnimationDetailPreview() {
             ) { state ->
                if (state == CardState.COMPACT) {
                   HabitRow(
+                     habitId = 1,
                      habitName = "Learn Jetpack Compose",
                      isToggled = false,
                      emoji = "🚀",

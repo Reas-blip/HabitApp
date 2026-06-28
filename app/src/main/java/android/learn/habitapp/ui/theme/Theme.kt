@@ -3,6 +3,8 @@ package android.learn.habitapp.ui.theme
 import android.os.Build
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,19 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+@OptIn(ExperimentalSharedTransitionApi::class)
+val CustomSpringTransformSpec = BoundsTransform { _, _ ->
+   spring(
+      dampingRatio = 0.78f, // Controls the bounce (under 1.0f gives a slight elastic kick)
+      stiffness = 450f      // Controls how fast the container accelerates to full size
+   )
+}
+
+val LocalTransformSpec = compositionLocalOf { CustomSpringTransformSpec }
+val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope> {
+   error("No SharedTransitionScope is provided wrap your composable with CompositionLocalProvider inside")
+}
+
 @Composable
 fun HabitAppTheme(
    darkTheme: Boolean = isSystemInDarkTheme(),
@@ -53,19 +68,19 @@ fun HabitAppTheme(
       darkTheme -> DarkColorScheme
       else -> LightColorScheme
    }
-   @OptIn(ExperimentalSharedTransitionApi::class)
-   val CustomSpringTransformSpec = BoundsTransform { _, _ ->
-      spring(
-         dampingRatio = 0.78f, // Controls the bounce (under 1.0f gives a slight elastic kick)
-         stiffness = 450f      // Controls how fast the container accelerates to full size
-      )
-   }
-   val LocalTransformSpec = compositionLocalOf { CustomSpringTransformSpec }
 
-   CompositionLocalProvider(LocalTransformSpec provides CustomSpringTransformSpec) {
    MaterialTheme(
       colorScheme = colorScheme,
       typography = Typography,
-      content = content
-   )}
+      content = {
+         SharedTransitionLayout {
+            CompositionLocalProvider(
+               LocalTransformSpec provides CustomSpringTransformSpec,
+               LocalSharedTransitionScope provides this
+            ) {
+               content()
+            }
+         }
+      }
+   )
 }
