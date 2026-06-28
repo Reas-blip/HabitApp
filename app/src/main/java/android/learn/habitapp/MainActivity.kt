@@ -20,12 +20,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionScope.ResizeMode
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -37,6 +40,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -164,7 +169,11 @@ class MainActivity : ComponentActivity() {
 
                   HabitMainScreen(
                      habitViewModel = habitViewModel,
-                     onCreateHabit = { navController.navigate(HabitDetail()) }) { habitId ->
+                     onCreateHabit = {
+                        viewModel.newHabit()
+                        navController.navigate(HabitDetail())
+                     }
+                  ) { habitId ->
                      viewModel.loadHabit(habitId)
                      navController.navigate(HabitDetail(habitId))
                   }
@@ -384,7 +393,6 @@ fun HabitItemRoute(
 ) {
    val uiState by viewModel.uiState.collectAsState()
 
-
    Surface(
       Modifier.fillMaxSize()
    ) {
@@ -421,6 +429,14 @@ fun HabitItemScreen(
    val focusManager = LocalFocusManager.current
    var clickTriggeredSheetOpen by remember { mutableStateOf(false) }
    val isKeyboardVisible = WindowInsets.isImeVisible
+   val roundedCornerAnimation by LocalAnimatedVisibilityScope.current.transition.animateDp(label = "rounded corner") { enterExit ->
+      when (enterExit) {
+         EnterExitState.PreEnter -> 20.dp
+         EnterExitState.Visible -> 0.dp
+         EnterExitState.PostExit -> 0.dp
+      }
+
+   }
 
    with(LocalSharedTransitionScope.current) {
       Column(
@@ -431,7 +447,11 @@ fun HabitItemScreen(
                      habit.id
                   )
                ),
-               animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+               animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+
+               clipInOverlayDuringTransition = OverlayClip(
+                  RoundedCornerShape(roundedCornerAnimation)
+               ),
             )
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
@@ -553,20 +573,29 @@ private fun HabitItemTopAppBar(
                   ),
                onEditIcon,
             )
-            IconButton(
-               modifier = Modifier
-                  .size(editButtonSize)
-                  .align(Alignment.BottomEnd),
-               onClick = onEditIcon,
-               colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.onPrimary)
-            ) {
-               Icon(
-                  imageVector = Icons.Outlined.ModeEditOutline,
-                  contentDescription = "Edit Icon",
+            with(LocalAnimatedVisibilityScope.current) {
+               IconButton(
                   modifier = Modifier
-                     .padding(3.dp)
-                     .fillMaxSize()
-               )
+                     .size(editButtonSize)
+                     .align(Alignment.BottomEnd)
+                     .renderInSharedTransitionScopeOverlay(
+                        zIndexInOverlay = 1f,
+                     )
+                     .animateEnterExit(
+                        enter = fadeIn() + slideInVertically() { it },
+                        exit = fadeOut() + slideOutVertically() { it }
+                     ),
+                  onClick = onEditIcon,
+                  colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.onPrimary)
+               ) {
+                  Icon(
+                     imageVector = Icons.Outlined.ModeEditOutline,
+                     contentDescription = "Edit Icon",
+                     modifier = Modifier
+                        .padding(3.dp)
+                        .fillMaxSize()
+                  )
+               }
             }
 
          }
@@ -638,21 +667,31 @@ fun HabitMainScreen(
    Scaffold(
       floatingActionButton = {
          if (showFab) {
-            FloatingActionButton(
-               onClick = onCreateHabit
-            ) {
-               IconButton(
-                  modifier = Modifier,
-                  onClick = onCreateHabit,
-               ) {
-                  Icon(
-                     tint = MaterialTheme.colorScheme.onPrimary,
-                     imageVector = Icons.Outlined.Add,
-                     contentDescription = "Add Icon",
+            with(LocalAnimatedVisibilityScope.current) {
+               with(LocalSharedTransitionScope.current) {
+                  FloatingActionButton(
+                     onClick = onCreateHabit,
                      modifier = Modifier
-                        .padding(3.dp)
-                        .fillMaxSize()
-                  )
+                        .renderInSharedTransitionScopeOverlay(
+                           zIndexInOverlay = 1f,
+                        )
+                        .animateEnterExit(
+                           enter = fadeIn() + slideInVertically() { it },
+                           exit = fadeOut() + slideOutVertically() { it }
+                        )
+
+                  ) {
+                     IconButton(onClick = onCreateHabit) {
+                        Icon(
+                           tint = MaterialTheme.colorScheme.onPrimary,
+                           imageVector = Icons.Outlined.Add,
+                           contentDescription = "Add Icon",
+                           modifier = Modifier
+                              .fillMaxSize()
+                              .padding(3.dp)
+                        )
+                     }
+                  }
                }
             }
          }
@@ -988,6 +1027,14 @@ fun HabitList(
 ) {
    val hazeState = rememberHazeState()
 
+   val roundedCornerAnimation by LocalAnimatedVisibilityScope.current.transition.animateDp(label = "rounded corner") { enterExit ->
+      when (enterExit) {
+         EnterExitState.PreEnter -> 0.dp
+         EnterExitState.Visible -> 20.dp
+         EnterExitState.PostExit -> 20.dp
+      }
+
+   }
    LazyColumn(
    ) {
       items(habitList, key = { habit -> habit.id }) { habit ->
@@ -1010,7 +1057,10 @@ fun HabitList(
                            habit.id
                         )
                      ),
-                     animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+                     animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+                     clipInOverlayDuringTransition = OverlayClip(
+                        RoundedCornerShape(roundedCornerAnimation)
+                     )
 
                   ),
                )
@@ -1040,7 +1090,6 @@ fun HabitRow(
          modifier = Modifier
             .padding(8.dp)
             .fillMaxWidth()
-            .then(modifier)
             .clickable { onClickHabit() }
 //         .hazeEffect(state = hazeState) {
 //            blurEffect {
@@ -1050,6 +1099,7 @@ fun HabitRow(
 //         }
             .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
+            .then(modifier)
             .padding(16.dp),
          verticalAlignment = Alignment.CenterVertically) {
          EmojiButton(

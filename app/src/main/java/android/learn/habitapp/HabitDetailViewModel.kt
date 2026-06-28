@@ -42,7 +42,7 @@ class HabitDetailViewModel @Inject constructor(
       }
    }
 
-   private fun newHabit() {
+   fun newHabit() {
       _uiState.update { it.copy(id = -1, name = "", emoji = "🎯", isDoneToday = false) }
    }
 
