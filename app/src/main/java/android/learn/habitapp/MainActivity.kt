@@ -138,6 +138,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dagger.hilt.android.AndroidEntryPoint
 import dev.chrisbanes.haze.rememberHazeState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 
@@ -169,9 +170,9 @@ class MainActivity : ComponentActivity() {
                         viewModel.newHabit()
                         navController.navigate(HabitDetail())
                      }
-                  ) { habitId, currentToken ->
+                  ) { habitId ->
                      viewModel.loadHabit(habitId)
-                     navController.navigate(HabitDetail(habitId, currentToken))
+                     navController.navigate(HabitDetail(habitId))
                   }
                }
 
@@ -179,12 +180,15 @@ class MainActivity : ComponentActivity() {
 
                   val detailArgs = backStackEntry.toRoute<HabitDetail>()
 
-
                   HabitItemRoute(
                      viewModel = viewModel,
                      habitId = detailArgs.habitId ?: -1,
-                     currentToken = detailArgs.currentToken,
-                  ) { navController.popBackStack() }
+                  ) {
+                     coroutineScope.launch {
+                        delay(50)
+                        navController.popBackStack()
+                     }
+                  }
                }
             }
          }
@@ -386,7 +390,6 @@ fun HabitEmojiPickerSheet(
 fun HabitItemRoute(
    viewModel: HabitDetailViewModel,
    habitId: Int,
-   currentToken: Long,
    onBack: () -> Unit,
 ) {
    val uiState by viewModel.uiState.collectAsState()
@@ -399,17 +402,15 @@ fun HabitItemRoute(
 
       HabitItemScreen(
          uiState,
-         currentToken,
          onNameChange = viewModel::onNameChanged,
          onEmojiChange = viewModel::onEmojiChanged,
-         onSave = viewModel::saveHabit,
+         onSave = { viewModel.saveHabit { onBack() } },
          onBack = {
             if (!hasNavigatedBack) {
                hasNavigatedBack = true
                onBack()
             }
-         },
-         modifier = Modifier
+         }
 
       )
    }
@@ -421,7 +422,6 @@ fun HabitItemRoute(
 @Composable
 fun HabitItemScreen(
    habit: HabitUiState,
-   currentToken: Long,
    onNameChange: (String) -> Unit,
    onEmojiChange: (String) -> Unit,
    onSave: () -> Unit,
@@ -443,11 +443,6 @@ fun HabitItemScreen(
       }
 
    }
-   val safeSaveAndNavigate = {
-      focusManager.clearFocus()
-      onSave()
-      // If your onSave doesn't trigger navigation automatically, call safeNavigateBack() here too.
-   }
    with(LocalSharedTransitionScope.current) {
       Column(
          Modifier
@@ -455,7 +450,6 @@ fun HabitItemScreen(
                sharedContentState = rememberSharedContentState(
                   key = HabitSharedElementKey(
                      habit.id,
-                     token = currentToken,
                      type = HabitSharedElementType.Bounds
                   )
                ),
@@ -473,13 +467,15 @@ fun HabitItemScreen(
             habit.emoji, onBackPressed = {
                focusManager.clearFocus()
                onBack()
-            }
-
-            , onEditIcon = {
+            }, onEditIcon = {
                focusManager.clearFocus()
                showEmojiPicker = true
 
-            }, onSaveHabit = safeSaveAndNavigate
+            }, onSaveHabit = {
+               focusManager.clearFocus()
+               onSave()
+               // If your onSave doesn't trigger navigation automatically, call safeNavigateBack() here too.
+            }
          )
 
          TextField(
@@ -622,10 +618,7 @@ private fun HabitItemTopAppBar(
 
          }
          Spacer(Modifier.width(30.dp))
-         IconButton(onClick = {
-            onSaveHabit()
-            onBackPressed()
-         }, modifier = Modifier) {
+         IconButton(onClick = onSaveHabit, modifier = Modifier) {
             Icon(
                imageVector = Icons.Default.Check,
                contentDescription = "Save",
@@ -640,10 +633,10 @@ private fun HabitItemTopAppBar(
 private fun EmojiButton(
    selectedEmoji: String,
    modifier: Modifier = Modifier,
-   onEditIcon: () -> Unit = {},
+   onClickIcon: () -> Unit = {},
 ) {
    IconButton(
-      onClick = onEditIcon,
+      onClick = onClickIcon,
       colors = IconButtonDefaults.iconButtonColors(MaterialTheme.colorScheme.surface),
       modifier = Modifier.then(modifier)
    ) {
@@ -654,7 +647,9 @@ private fun EmojiButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitMainScreen(
-   habitViewModel: HabitViewModel, onCreateHabit: () -> Unit, onHabitClicked: (Int, Long) -> Unit
+   habitViewModel: HabitViewModel,
+   onCreateHabit: () -> Unit,
+   onHabitClicked: (Int) -> Unit
 ) {
 
    val searchQuery by habitViewModel.searchQuery.collectAsState()
@@ -766,7 +761,7 @@ fun HabitMainScreen(
                            modifier = Modifier
                               .fillMaxWidth()
                               .clickable {
-                                 onHabitClicked(habit.id, 0L)
+                                 onHabitClicked(habit.id)
                                  isSearchExpanded = false
                                  habitViewModel.onSearchQueryChange("")
                                  focusManager.clearFocus()
@@ -795,9 +790,9 @@ fun HabitMainScreen(
                is UiState.Success -> HabitList(
                   habits, onToggleHabitId = { habitId ->
                      habitViewModel.onHabitChecked(habitId)
-                  }) { habitId, currentToken ->
+                  }) { habitId ->
                   onHabitClicked(
-                     habitId, currentToken
+                     habitId
                   )
                }
 
@@ -1049,7 +1044,7 @@ fun SearchHabitBar(
 fun HabitList(
    habitList: List<HabitUiState>,
    onToggleHabitId: (habitId: Int) -> Unit,
-   onHabitItemClick: (Int, Long) -> Unit = { _, _ -> }
+   onHabitItemClick: (Int) -> Unit
 ) {
    val hazeState = rememberHazeState()
 
@@ -1065,35 +1060,31 @@ fun HabitList(
    LazyColumn() {
       items(habitList, key = { habit -> habit.id }) { habit ->
          with(LocalSharedTransitionScope.current) {
-            Surface(
-               Modifier
-            ) {
-               Log.d("Tag", "prove that it works ${habit.id}")
-               HabitRow(
-                  habitId = habit.id,
-                  habitName = habit.name,
-                  isToggled = habit.isDoneToday,
-                  emoji = habit.emoji,
+
+            Log.d("Tag", "prove that it works ${habit.id}")
+            HabitRow(
+               habitId = habit.id,
+               habitName = habit.name,
+               isToggled = habit.isDoneToday,
+               emoji = habit.emoji,
 //                  hazeState = hazeState,
-                  onToggle = { onToggleHabitId(habit.id) },
-                  onClickHabit = { onHabitItemClick(habit.id, currentToken) },
-                  modifier = Modifier.sharedBounds(
-                     sharedContentState = rememberSharedContentState(
-                        key = HabitSharedElementKey(
-                           habit.id,
-                           currentToken,
-                           type = HabitSharedElementType.Bounds
-                        )
-                     ),
-                     animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
-                     clipInOverlayDuringTransition = OverlayClip(
-                        RoundedCornerShape(roundedCornerAnimation)
+               onToggle = { onToggleHabitId(habit.id) },
+               onClickHabit = { onHabitItemClick(habit.id) },
+               modifier = Modifier.sharedBounds(
+                  sharedContentState = rememberSharedContentState(
+                     key = HabitSharedElementKey(
+                        habit.id,
+                        type = HabitSharedElementType.Bounds
                      )
-
                   ),
-               )
+                  animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+                  clipInOverlayDuringTransition = OverlayClip(
+                     RoundedCornerShape(roundedCornerAnimation)
+                  )
 
-            }
+               ),
+            )
+
 
          }
       }
@@ -1132,6 +1123,7 @@ fun HabitRow(
          verticalAlignment = Alignment.CenterVertically) {
          EmojiButton(
             selectedEmoji = emoji,
+            onClickIcon = onClickHabit,
             modifier = Modifier
                .sharedElement(
                   rememberSharedContentState(

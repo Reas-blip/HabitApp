@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -13,6 +14,8 @@ interface HabitDao {
    @Insert(onConflict = OnConflictStrategy.REPLACE)
    fun insertHabit(habit: HabitEntity)
 
+   @Update
+   fun updateHabit(habit: HabitEntity)
    @Query("DELETE FROM habits WHERE id = :habitId")
    fun deleteHabit(habitId: Int)
 
@@ -28,7 +31,7 @@ interface HabitDao {
 
    @Transaction
    @Query("SELECT * from habits where id =:habitId")
-   fun loadHabitWithLogs(habitId: Int): Flow<HabitWithLogs>
+   fun loadHabitWithLogs(habitId: Int): HabitWithLogs
 
    @Query("SELECT * from habits WHERE id = :habitId")
    fun loadHabit(habitId: Int): HabitEntity

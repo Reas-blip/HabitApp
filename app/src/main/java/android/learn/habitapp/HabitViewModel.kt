@@ -20,35 +20,47 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
+
 // Simple sealed class to hold your events
 sealed class UiEvent {
    data class ShowError(val message: String) : UiEvent()
 }
+
 @HiltViewModel
-class HabitViewModel @Inject constructor(private val habitRepository: HabitRepository) : ViewModel() {
+class HabitViewModel @Inject constructor(private val habitRepository: HabitRepository) :
+   ViewModel() {
 
    private val _uiEvent = MutableSharedFlow<UiEvent>()
    val uiEvent = _uiEvent.asSharedFlow()
 
    // 1. The Source of Truth (Database-backed)
    // We update this ONLY when the database changes
-   private val _habitUiState = MutableStateFlow<UiState>(UiState.Loading)
-   val habitUiState = _habitUiState.asStateFlow()
+
+   val habitUiState: StateFlow<UiState> = habitRepository.getHabitsWithLogs()
+      .map { rawData ->
+         UiState.Success(transformToUiState(rawData))
+      }
+      .stateIn(
+         scope = viewModelScope,
+         started = SharingStarted.WhileSubscribed(5000), // Automatically stops listening if user leaves the screen
+         initialValue = UiState.Loading // The default state while the database loads
+      )
 
    // 2. The Search Query
    private val _searchQuery = MutableStateFlow("")
    val searchQuery = _searchQuery.asStateFlow()
 
-   // 3. The Filtered View (The "FilteredUiState" you asked for)
+   // 3. The Filtered View: filters according the searchQuery
    // This is derived automatically from the two inputs above.
    val filteredHabitUiState: StateFlow<UiState> = combine(
-      _habitUiState,
+      habitUiState,
       _searchQuery
    ) { rawState, query ->
       if (rawState is UiState.Success) {
@@ -63,26 +75,15 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
-   init {
-      loadHabits()
-   }
 
-   private fun loadHabits() {
-      viewModelScope.launch(Dispatchers.IO) {
-//         delay(3000)
-         habitRepository.getHabitsWithLogs().collect { rawData ->
-            // We update the SOURCE, never the filtered view
-            _habitUiState.value = UiState.Success(transformToUiState(rawData))
-         }
-      }
-   }
+
    fun onSearchQueryChange(newQuery: String) {
       _searchQuery.value = newQuery
    }
 
    suspend fun loadHabit(habitId: Int): HabitUiState = withContext(Dispatchers.IO) {
 //      val habit = HabitEntity("")
-         val habit = habitRepository.load(habitId)
+      val habit = habitRepository.load(habitId)
       return@withContext HabitUiState(
          id = habit.id,
          name = habit.name,
@@ -134,6 +135,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    }
 
 }
+
 fun getStartOfTodayTimestamp(): Long {
    return LocalDate.now(ZoneId.systemDefault())
       .atStartOfDay(ZoneId.systemDefault())

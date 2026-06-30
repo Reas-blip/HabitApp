@@ -9,6 +9,7 @@ import javax.inject.Inject
 
 interface HabitRepository {
    suspend fun insertHabit(habit: HabitEntity)
+   suspend fun updateHabit(habit: HabitEntity)
 
    suspend fun insertHabitLog(habitLog: HabitLogsEntity)
    suspend fun deleteHabitLog(habitId: Int, today: Long)
@@ -19,7 +20,7 @@ interface HabitRepository {
 
    fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>
 
-   fun loadHabitWithLogs(habitId: Int): Flow<HabitWithLogs>
+   fun loadHabitWithLogs(habitId: Int): HabitWithLogs
 
 
 }
@@ -29,6 +30,10 @@ class HabitRepositoryImpl @Inject constructor (
 ): HabitRepository {
    override suspend fun insertHabit(habit: HabitEntity) {
       habitDao.insertHabit(habit)
+   }
+
+   override suspend fun updateHabit(habit: HabitEntity) {
+      habitDao.updateHabit(habit)
    }
 
    override suspend fun insertHabitLog(habitLog: HabitLogsEntity) {
@@ -52,7 +57,7 @@ class HabitRepositoryImpl @Inject constructor (
       return habitDao.getHabitsWithLogs()
    }
 
-   override fun loadHabitWithLogs(habitId: Int): Flow<HabitWithLogs> {
+   override fun loadHabitWithLogs(habitId: Int): HabitWithLogs {
       return habitDao.loadHabitWithLogs(habitId)
    }
 

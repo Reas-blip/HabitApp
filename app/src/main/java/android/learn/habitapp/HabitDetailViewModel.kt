@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -42,24 +43,22 @@ class HabitDetailViewModel @Inject constructor(
       }
    }
 
-    fun newHabit() {
+   fun newHabit() {
       _uiState.update { it.copy(id = -1, name = "", emoji = "🎯", isDoneToday = false) }
    }
 
    fun loadHabit(id: Int) {
       viewModelScope.launch(Dispatchers.IO) {
-         val habit = repository.loadHabitWithLogs(id)
+         val habitWithLogs = repository.loadHabitWithLogs(id)
+         val habit = habitWithLogs.habit
+         val today = getStartOfTodayTimestamp()
 
-         habit.collect { habitWithLogs ->
-            val habit = habitWithLogs.habit
-            val today: Long = getStartOfTodayTimestamp()
-            _uiState.value = HabitUiState(
-               name = habit.name,
-               id = habit.id,
-               emoji = habit.emoji,
-               isDoneToday = habitWithLogs.logs.any { today == it.date },
-            )
-         }
+         _uiState.value = HabitUiState(
+            name = habit.name,
+            id = habit.id,
+            emoji = habit.emoji,
+            isDoneToday = habitWithLogs.logs.any { today == it.date }
+         )
       }
    }
 
@@ -75,28 +74,32 @@ class HabitDetailViewModel @Inject constructor(
       }
    }
 
-   fun saveHabit() {
+   fun saveHabit(onCompleted: () -> Unit) {
       viewModelScope.launch(Dispatchers.IO) {
-         repository.insertHabit(
-            when (_uiState.value.id) {
-               -1 -> {
+         when (_uiState.value.id) {
+            -1 -> {
+               repository.insertHabit(
                   HabitEntity(
                      name = _uiState.value.name,
                      emoji = _uiState.value.emoji
                   )
-               }
+               )
+            }
 
-               else -> {
+            else -> {
+               repository.updateHabit(
                   HabitEntity(
                      id = _uiState.value.id,
                      name = _uiState.value.name,
                      emoji = _uiState.value.emoji
                   )
-               }
-
+               )
             }
 
-         )
+         }
+         viewModelScope.launch(Dispatchers.Main) {
+            onCompleted()
+         }
       }
    }
 }
