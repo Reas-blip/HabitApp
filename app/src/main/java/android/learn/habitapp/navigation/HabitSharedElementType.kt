@@ -1,8 +1,13 @@
 package android.learn.habitapp.navigation
 
-sealed class HabitSharedElementType {
-   data class Background(val id: Int): HabitSharedElementType()
-   data class Bounds(val id: Int): HabitSharedElementType()
-   data class Emoji(val id: Int): HabitSharedElementType()
-   data class Title(val id: Int): HabitSharedElementType()
+data class HabitSharedElementKey(
+   val habitId: Int,
+   val token: Long = 0L,
+   val type: HabitSharedElementType
+)
+enum class HabitSharedElementType {
+  Background,
+   Bounds,
+   Emoji,
+
 }

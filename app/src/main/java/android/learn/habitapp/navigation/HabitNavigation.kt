@@ -9,5 +9,4 @@ data object HabitList : Destination
 
 @Serializable
 data class HabitDetail(
-   val habitId: Int? = null
-) : Destination
+   val habitId: Int? = null, val currentToken: Long = 0L) : Destination

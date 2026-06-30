@@ -5,6 +5,7 @@ import android.learn.habitapp.data.emoji.HabitEmojiData
 import android.learn.habitapp.data.repository.HabitEmojiRepository
 import android.learn.habitapp.navigation.HabitDetail
 import android.learn.habitapp.navigation.HabitList
+import android.learn.habitapp.navigation.HabitSharedElementKey
 import android.learn.habitapp.navigation.HabitSharedElementType
 import android.learn.habitapp.navigation.LocalAnimatedVisibilityScope
 import android.learn.habitapp.navigation.animatedComposable
@@ -21,9 +22,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SharedTransitionScope.ResizeMode
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -135,12 +133,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dagger.hilt.android.AndroidEntryPoint
-import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.launch
 
@@ -173,9 +169,9 @@ class MainActivity : ComponentActivity() {
                         viewModel.newHabit()
                         navController.navigate(HabitDetail())
                      }
-                  ) { habitId ->
+                  ) { habitId, currentToken ->
                      viewModel.loadHabit(habitId)
-                     navController.navigate(HabitDetail(habitId))
+                     navController.navigate(HabitDetail(habitId, currentToken))
                   }
                }
 
@@ -187,6 +183,7 @@ class MainActivity : ComponentActivity() {
                   HabitItemRoute(
                      viewModel = viewModel,
                      habitId = detailArgs.habitId ?: -1,
+                     currentToken = detailArgs.currentToken,
                   ) { navController.popBackStack() }
                }
             }
@@ -389,10 +386,12 @@ fun HabitEmojiPickerSheet(
 fun HabitItemRoute(
    viewModel: HabitDetailViewModel,
    habitId: Int,
+   currentToken: Long,
    onBack: () -> Unit,
 ) {
    val uiState by viewModel.uiState.collectAsState()
 
+   var hasNavigatedBack by remember { mutableStateOf(false) }
    Surface(
       Modifier.fillMaxSize()
    ) {
@@ -400,10 +399,16 @@ fun HabitItemRoute(
 
       HabitItemScreen(
          uiState,
+         currentToken,
          onNameChange = viewModel::onNameChanged,
          onEmojiChange = viewModel::onEmojiChanged,
          onSave = viewModel::saveHabit,
-         onBack = onBack,
+         onBack = {
+            if (!hasNavigatedBack) {
+               hasNavigatedBack = true
+               onBack()
+            }
+         },
          modifier = Modifier
 
       )
@@ -416,6 +421,7 @@ fun HabitItemRoute(
 @Composable
 fun HabitItemScreen(
    habit: HabitUiState,
+   currentToken: Long,
    onNameChange: (String) -> Unit,
    onEmojiChange: (String) -> Unit,
    onSave: () -> Unit,
@@ -433,18 +439,24 @@ fun HabitItemScreen(
       when (enterExit) {
          EnterExitState.PreEnter -> 20.dp
          EnterExitState.Visible -> 0.dp
-         EnterExitState.PostExit -> 0.dp
+         EnterExitState.PostExit -> 20.dp
       }
 
    }
-
+   val safeSaveAndNavigate = {
+      focusManager.clearFocus()
+      onSave()
+      // If your onSave doesn't trigger navigation automatically, call safeNavigateBack() here too.
+   }
    with(LocalSharedTransitionScope.current) {
       Column(
          Modifier
             .sharedBounds(
                sharedContentState = rememberSharedContentState(
-                  key = HabitSharedElementType.Bounds(
-                     habit.id
+                  key = HabitSharedElementKey(
+                     habit.id,
+                     token = currentToken,
+                     type = HabitSharedElementType.Bounds
                   )
                ),
                animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
@@ -458,11 +470,16 @@ fun HabitItemScreen(
       ) {
          HabitItemTopAppBar(
             habit.id,
-            habit.emoji, onBackPressed = onBack, onEditIcon = {
+            habit.emoji, onBackPressed = {
+               focusManager.clearFocus()
+               onBack()
+            }
+
+            , onEditIcon = {
                focusManager.clearFocus()
                showEmojiPicker = true
 
-            }, onSaveHabit = onSave
+            }, onSaveHabit = safeSaveAndNavigate
          )
 
          TextField(
@@ -568,7 +585,12 @@ private fun HabitItemTopAppBar(
                modifier = Modifier
                   .onSizeChanged { emojiSize = it }
                   .sharedElement(
-                     rememberSharedContentState(key = HabitSharedElementType.Emoji(habitId)),
+                     rememberSharedContentState(
+                        key = HabitSharedElementKey(
+                           habitId,
+                           type = HabitSharedElementType.Emoji
+                        )
+                     ),
                      animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
                   ),
                onEditIcon,
@@ -632,12 +654,13 @@ private fun EmojiButton(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitMainScreen(
-   habitViewModel: HabitViewModel, onCreateHabit: () -> Unit, onHabitClicked: (Int) -> Unit
+   habitViewModel: HabitViewModel, onCreateHabit: () -> Unit, onHabitClicked: (Int, Long) -> Unit
 ) {
 
    val searchQuery by habitViewModel.searchQuery.collectAsState()
-   val habitUiState by habitViewModel.habitsUiState.collectAsStateWithLifecycle()
+   val habitUiState by habitViewModel.habitUiState.collectAsStateWithLifecycle()
 
+   val filteredHabitUiState by habitViewModel.filteredHabitUiState.collectAsStateWithLifecycle()
    val habits by remember {
       derivedStateOf {
          (habitUiState as? UiState.Success)?.habits ?: emptyList()
@@ -647,7 +670,10 @@ fun HabitMainScreen(
    val filteredHabits by remember {
       derivedStateOf {
          if (searchQuery.isEmpty()) emptyList()
-         else habits
+         else when (filteredHabitUiState) {
+            is UiState.Success -> (filteredHabitUiState as UiState.Success).habits
+            else -> emptyList()
+         }
       }
    }
 
@@ -740,7 +766,7 @@ fun HabitMainScreen(
                            modifier = Modifier
                               .fillMaxWidth()
                               .clickable {
-                                 onHabitClicked(habit.id)
+                                 onHabitClicked(habit.id, 0L)
                                  isSearchExpanded = false
                                  habitViewModel.onSearchQueryChange("")
                                  focusManager.clearFocus()
@@ -769,9 +795,9 @@ fun HabitMainScreen(
                is UiState.Success -> HabitList(
                   habits, onToggleHabitId = { habitId ->
                      habitViewModel.onHabitChecked(habitId)
-                  }) { habitId ->
+                  }) { habitId, currentToken ->
                   onHabitClicked(
-                     habitId
+                     habitId, currentToken
                   )
                }
 
@@ -1023,10 +1049,11 @@ fun SearchHabitBar(
 fun HabitList(
    habitList: List<HabitUiState>,
    onToggleHabitId: (habitId: Int) -> Unit,
-   onHabitItemClick: (Int) -> Unit = {}
+   onHabitItemClick: (Int, Long) -> Unit = { _, _ -> }
 ) {
    val hazeState = rememberHazeState()
 
+   val currentToken = remember { System.currentTimeMillis() }
    val roundedCornerAnimation by LocalAnimatedVisibilityScope.current.transition.animateDp(label = "rounded corner") { enterExit ->
       when (enterExit) {
          EnterExitState.PreEnter -> 0.dp
@@ -1035,8 +1062,7 @@ fun HabitList(
       }
 
    }
-   LazyColumn(
-   ) {
+   LazyColumn() {
       items(habitList, key = { habit -> habit.id }) { habit ->
          with(LocalSharedTransitionScope.current) {
             Surface(
@@ -1050,11 +1076,13 @@ fun HabitList(
                   emoji = habit.emoji,
 //                  hazeState = hazeState,
                   onToggle = { onToggleHabitId(habit.id) },
-                  onClickHabit = { onHabitItemClick(habit.id) },
+                  onClickHabit = { onHabitItemClick(habit.id, currentToken) },
                   modifier = Modifier.sharedBounds(
                      sharedContentState = rememberSharedContentState(
-                        key = HabitSharedElementType.Bounds(
-                           habit.id
+                        key = HabitSharedElementKey(
+                           habit.id,
+                           currentToken,
+                           type = HabitSharedElementType.Bounds
                         )
                      ),
                      animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
@@ -1104,10 +1132,16 @@ fun HabitRow(
          verticalAlignment = Alignment.CenterVertically) {
          EmojiButton(
             selectedEmoji = emoji,
-            modifier = Modifier.sharedElement(
-               rememberSharedContentState(key = HabitSharedElementType.Emoji(habitId)),
-               animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
-            )
+            modifier = Modifier
+               .sharedElement(
+                  rememberSharedContentState(
+                     key = HabitSharedElementKey(
+                        habitId, type = HabitSharedElementType.Emoji
+                     )
+                  ),
+                  animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+               )
+               .skipToLookaheadSize()
          )
          Spacer(modifier = Modifier.weight(.1f))
          Text(

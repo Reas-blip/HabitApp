@@ -1,134 +1,116 @@
-
-package android.learn.habitapp
-
-import android.learn.habitapp.ui.CardState
-import android.learn.habitapp.ui.HabitUiState
-import android.learn.habitapp.ui.theme.HabitAppTheme
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.animateRect
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.dp
-
-@Preview(showBackground = true, widthDp = 360, heightDp = 640)
-@Composable
-fun HabitAnimationDetailPreview() {
-   // 1. WRAPPED IN THEME to prevent Material 3 crashes
-   HabitAppTheme {
-      val density = LocalDensity.current
-      val screen = LocalConfiguration.current
-
-      val screenWidthPx = with(density) { screen.screenWidthDp.dp.toPx() }
-      val screenHeightPx = with(density) { screen.screenHeightDp.dp.toPx() }
-
-      // Mock the starting bounds of a row in a list
-      val startBounds = remember(density) {
-         Rect(
-            left = with(density) { 16.dp.toPx() },
-            top = with(density) { 150.dp.toPx() },
-            right = with(density) { (360.dp - 16.dp).toPx() },
-            bottom = with(density) { 230.dp.toPx() }
-         )
-      }
-
-      var expanded by remember { mutableStateOf(false) }
-
-      val currentState = if (expanded) CardState.EXPANDED else CardState.COMPACT
-      val transition = updateTransition(targetState = currentState, label = "card_morph")
-
-      val bounds by transition.animateRect(
-         transitionSpec = { spring(dampingRatio = 0.8f, stiffness = 300f) },
-         label = "bounds"
-      ) { state ->
-         if (state == CardState.EXPANDED) Rect(0f, 0f, screenWidthPx, screenHeightPx)
-         else startBounds
-      }
-
-      val corner by transition.animateDp(
-         transitionSpec = { tween(300) },
-         label = "corner"
-      ) { state -> if (state == CardState.EXPANDED) 0.dp else 20.dp }
-
-      Box(
-         Modifier
-            .fillMaxSize()
-            .background(Color.LightGray)
-      ) {
-         Text(
-            text = "Background Item (Should be hidden when expanded)",
-            modifier = Modifier.padding(top = 100.dp, start = 16.dp)
-         )
-
-         Box(
-            modifier = Modifier
-               .offset { IntOffset(bounds.left.toInt(), bounds.top.toInt()) }
-               .size(
-                  width = with(density) { bounds.width.toDp() },
-                  height = with(density) { bounds.height.toDp() }
-               )
-               .clip(RoundedCornerShape(corner))
-               .background(MaterialTheme.colorScheme.surface)
-         ) {
-            transition.AnimatedContent(
-               transitionSpec = {
-                  fadeIn(tween(200)) togetherWith fadeOut(tween(200))
-               },
-               contentKey = { it },
-               modifier = Modifier.fillMaxSize()
-            ) { state ->
-               if (state == CardState.COMPACT) {
-                  HabitRow(
-                     habitId = 1,
-                     habitName = "Learn Jetpack Compose",
-                     isToggled = false,
-                     emoji = "🚀",
-                     modifier = Modifier.fillMaxSize(),
-                     onClickHabit = { expanded = true }
-                  )
-               } else {
-                  HabitItemScreen(
-                     habit = HabitUiState(
-                        id = 1,
-                        name = "Learn Jetpack Compose",
-                        emoji = "🚀",
-                        isDoneToday = false
-                     ),
-                     onNameChange = {},
-                     onEmojiChange = {},
-                     onSave = { expanded = false },
-                     onBack = { expanded = false },
-                     modifier = Modifier.fillMaxSize()
-                  )
-               }
-            }
-         }
-      }
-   }
-}
+package android.learn.habitapp//package android.learn.habitapp
+//
+//import android.learn.habitapp.navigation.HabitSharedElementKey
+//import android.learn.habitapp.navigation.HabitSharedElementType
+//import android.learn.habitapp.navigation.LocalAnimatedVisibilityScope
+//import android.learn.habitapp.ui.HabitUiState
+//import android.learn.habitapp.ui.theme.HabitAppTheme
+//import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
+//import androidx.compose.animation.AnimatedContent
+//import androidx.compose.animation.EnterExitState
+//import androidx.compose.animation.ExperimentalSharedTransitionApi
+//import androidx.compose.animation.SharedTransitionLayout
+//import androidx.compose.animation.core.animateDp
+//import androidx.compose.foundation.layout.Box
+//import androidx.compose.foundation.layout.fillMaxSize
+//import androidx.compose.foundation.layout.padding
+//import androidx.compose.foundation.shape.RoundedCornerShape
+//import androidx.compose.runtime.Composable
+//import androidx.compose.runtime.CompositionLocalProvider
+//import androidx.compose.runtime.getValue
+//import androidx.compose.runtime.mutableStateOf
+//import androidx.compose.runtime.remember
+//import androidx.compose.runtime.setValue
+//import androidx.compose.ui.Alignment
+//import androidx.compose.ui.Modifier
+//import androidx.compose.ui.tooling.preview.Preview
+//import androidx.compose.ui.unit.dp
+//
+//@OptIn(ExperimentalSharedTransitionApi::class)
+//@Preview(showBackground = true, widthDp = 360, heightDp = 720)
+//@Composable
+//fun HabitTransitionInteractivePreview() {
+//   HabitAppTheme {
+//      // 1. Maintain a state to toggle between the list row and detail screen
+//      var showDetail by remember { mutableStateOf(false) }
+//
+//      // Mock data matching your HabitUiState structure
+//      val mockHabit = remember {
+//         HabitUiState(
+//            id = 1,
+//            name = "Read 10 Pages",
+//            emoji = "📚",
+//            isDoneToday = false
+//         )
+//      }
+//
+//      // 2. Wrap everything in the root SharedTransitionLayout
+//      SharedTransitionLayout {
+//         CompositionLocalProvider(
+//            LocalSharedTransitionScope provides this@SharedTransitionLayout
+//         ) {
+//            // 3. Use AnimatedContent to drive the transition and generate the visibility scope
+//            AnimatedContent(
+//               targetState = showDetail,
+//               label = "screen_switch_transition"
+//            ) { isDetailVisible ->
+//
+//               CompositionLocalProvider(
+//                  LocalAnimatedVisibilityScope provides this@AnimatedContent
+//               ) {
+//                  if (isDetailVisible) {
+//                     // Render Detail Screen
+//                     HabitItemScreen(
+//                        habit = mockHabit,
+//                        currentToken1 = currentToken,
+//                        onNameChange = {},
+//                        onEmojiChange = {},
+//                        onSave = { showDetail = false },
+//                        onBack = { showDetail = false }
+//                     )
+//                  } else {
+//                     // Render List Container holding the row element
+//                     Box(
+//                        modifier = Modifier
+//                           .fillMaxSize()
+//                           .padding(16.dp),
+//                        contentAlignment = Alignment.TopCenter
+//                     ) {
+//                        // Mirror the exact animations/bounds setup from your HabitList
+//                        val roundedCornerAnimation by LocalAnimatedVisibilityScope.current.transition.animateDp(
+//                           label = "preview_corner"
+//                        ) { enterExit ->
+//                           when (enterExit) {
+//                              EnterExitState.PreEnter -> 20.dp
+//                              EnterExitState.Visible -> 20.dp
+//                              EnterExitState.PostExit -> 20.dp
+//                           }
+//                        }
+//
+//                        HabitRow(
+//                           habitId = mockHabit.id,
+//                           habitName = mockHabit.name,
+//                           isToggled = mockHabit.isDoneToday,
+//                           emoji = mockHabit.emoji,
+//                           onClickHabit = { showDetail = true },
+//                           modifier = Modifier.sharedBounds(
+//                              sharedContentState = rememberSharedContentState(
+//                                 key = HabitSharedElementKey(
+//                                    habitId = mockHabit.id,
+//                                    type = HabitSharedElementType.Bounds
+//                                 )
+//                              ),
+//                              animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+//                              clipInOverlayDuringTransition = OverlayClip(
+//                                 RoundedCornerShape(roundedCornerAnimation)
+//                              )
+//                           )
+//                        )
+//                     }
+//                  }
+//               }
+//            }
+//         }
+//      }
+//   }
+//}

@@ -12,8 +12,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -22,57 +26,60 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
-
+// Simple sealed class to hold your events
+sealed class UiEvent {
+   data class ShowError(val message: String) : UiEvent()
+}
 @HiltViewModel
 class HabitViewModel @Inject constructor(private val habitRepository: HabitRepository) : ViewModel() {
 
-   val _habitUiState = MutableStateFlow<UiState>(UiState.Loading)
+   private val _uiEvent = MutableSharedFlow<UiEvent>()
+   val uiEvent = _uiEvent.asSharedFlow()
+
+   // 1. The Source of Truth (Database-backed)
+   // We update this ONLY when the database changes
+   private val _habitUiState = MutableStateFlow<UiState>(UiState.Loading)
+   val habitUiState = _habitUiState.asStateFlow()
+
+   // 2. The Search Query
    private val _searchQuery = MutableStateFlow("")
    val searchQuery = _searchQuery.asStateFlow()
 
-   val habitsUiState = combine(
-      habitRepository.getHabitsWithLogs(),
+   // 3. The Filtered View (The "FilteredUiState" you asked for)
+   // This is derived automatically from the two inputs above.
+   val filteredHabitUiState: StateFlow<UiState> = combine(
+      _habitUiState,
       _searchQuery
-   ) { rawData, query ->
-      val transformed = transformToUiState(rawData)
-      if (query.isEmpty()) {
-         UiState.Success(transformed)
+   ) { rawState, query ->
+      if (rawState is UiState.Success) {
+         val habits = rawState.habits
+         if (query.isEmpty()) {
+            UiState.Success(habits)
+         } else {
+            UiState.Success(habits.filter { it.name.contains(query, ignoreCase = true) })
+         }
       } else {
-         UiState.Success(transformed.filter { it.name.contains(query, ignoreCase = true) })
+         rawState // Pass through Loading or Error states
       }
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
    init {
       loadHabits()
    }
-   private val _selectedHabit = MutableStateFlow(
 
-      SelectedHabit(habitId = -1, bounds = Rect.Zero, expanded = false)
-   )
-   val selectedHabit = _selectedHabit.asStateFlow()
-
-   fun selectHabit(habitId: Int, bounds: Rect) {
-      _selectedHabit.value = SelectedHabit(habitId, bounds, false)
-   }
-   fun clearSelection() {
-      // Just set expanded to false, DON'T reset the ID yet
-      _selectedHabit.value = _selectedHabit.value.copy(expanded = false)
-   }
-
-   fun resetToIdle() {
-      // ONLY call this when the animation is 100% finished
-      _selectedHabit.value = SelectedHabit(habitId = -1, bounds = Rect.Zero, expanded = false)
-   }
-   fun onSearchQueryChange(newQuery: String) {
-      _searchQuery.value = newQuery
-   }
    private fun loadHabits() {
-      viewModelScope.launch(Dispatchers.Default) {
+      viewModelScope.launch(Dispatchers.IO) {
+//         delay(3000)
          habitRepository.getHabitsWithLogs().collect { rawData ->
+            // We update the SOURCE, never the filtered view
             _habitUiState.value = UiState.Success(transformToUiState(rawData))
          }
       }
    }
+   fun onSearchQueryChange(newQuery: String) {
+      _searchQuery.value = newQuery
+   }
+
    suspend fun loadHabit(habitId: Int): HabitUiState = withContext(Dispatchers.IO) {
 //      val habit = HabitEntity("")
          val habit = habitRepository.load(habitId)
@@ -87,7 +94,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    fun onHabitChecked(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
          try {
-            val uiState = _habitUiState.value as? UiState.Success ?: return@launch
+            val uiState = habitUiState.value as? UiState.Success ?: return@launch
             val habit = uiState.habits.find { it.id == habitId } ?: return@launch
             val today = getStartOfTodayTimestamp()
 
@@ -97,7 +104,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
                habitRepository.insertHabitLog(HabitLogsEntity(habitId = habitId, date = today))
             }
          } catch (e: Exception) {
-            _habitUiState.value = UiState.Error("An Error occurred: $e")
+            _uiEvent.emit(UiEvent.ShowError("Could not update habit: ${e.message}"))
          }
 
 
@@ -112,29 +119,6 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }
 
-   fun onAddHabit(name: String, emoji: String) {
-      viewModelScope.launch(Dispatchers.IO) {
-         habitRepository.insertHabit(
-            HabitEntity(
-               name = name,
-               emoji = emoji
-            )
-         )
-      }
-   }
-
-
-   fun onSaveHabit(habitId: Int, name: String, emoji: String) {
-      viewModelScope.launch(Dispatchers.IO) {
-         habitRepository.insertHabit(
-            HabitEntity(
-               id = habitId,
-               name = name,
-               emoji = emoji
-            )
-         )
-      }
-   }
    private fun transformToUiState(habitWithLogs: List<HabitWithLogs>): List<HabitUiState> {
       val today = getStartOfTodayTimestamp()
 
@@ -148,11 +132,6 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          )
       }
    }
-
-   fun expandSelected() {
-      _selectedHabit.value =  _selectedHabit.value.copy(expanded = true)
-   }
-
 
 }
 fun getStartOfTodayTimestamp(): Long {
