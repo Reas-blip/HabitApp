@@ -75,7 +75,12 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
+   val hasSeenSwipeHint: StateFlow<Boolean> = habitRepository.hasSeenSwipeHint
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true) // default true = don't show until loaded, avoids flash
 
+   fun markSwipeHintSeen() {
+      viewModelScope.launch { habitRepository.setSwipeHintSeen() }
+   }
 
    fun onSearchQueryChange(newQuery: String) {
       _searchQuery.value = newQuery
@@ -112,6 +117,17 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }
 
+   fun onHabitsReordered(idsInOrder: List<Int>) {
+      viewModelScope.launch {
+         habitRepository.updateSortOrders(idsInOrder)
+      }
+   }
+
+   fun onArchiveHabit(habitId: Int) {
+      viewModelScope.launch {
+         habitRepository.archiveHabit(habitId)
+      }
+   }
    fun onDeleteHabit(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
 

@@ -77,6 +77,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEa
 
 dependencies {
    implementation("androidx.compose.animation:animation")
+   implementation("sh.calvin.reorderable:reorderable:2.4.3")
    implementation(libs.androidx.runner)
    implementation(libs.koin.android)
    implementation(libs.koin.androidx.compose)

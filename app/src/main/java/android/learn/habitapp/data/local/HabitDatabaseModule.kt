@@ -12,16 +12,17 @@ import kotlin.jvm.java
 
 @Module
 @InstallIn(SingletonComponent::class)
-object HabitDatabaseModule {
+object HabitLocalDataModule {
+   @Provides
+   @Singleton
+   fun provideHabitPreferences(@ApplicationContext context: Context): HabitPreferences {
+      return HabitPreferences(context)
+   }
 
    @Provides
    @Singleton
    fun provideDatabase(@ApplicationContext context: Context): HabitDatabase {
-      return Room.databaseBuilder(
-         context,
-         HabitDatabase::class.java,
-         "habit_database"
-      ).build()
+      return HabitDatabase.getDatabase(context)
    }
 
    @Provides

@@ -1,31 +1,30 @@
-package android.learn.habitapp//package android.learn.habitapp
-//
-//import android.learn.habitapp.navigation.HabitSharedElementKey
-//import android.learn.habitapp.navigation.HabitSharedElementType
-//import android.learn.habitapp.navigation.LocalAnimatedVisibilityScope
-//import android.learn.habitapp.ui.HabitUiState
-//import android.learn.habitapp.ui.theme.HabitAppTheme
-//import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
-//import androidx.compose.animation.AnimatedContent
-//import androidx.compose.animation.EnterExitState
-//import androidx.compose.animation.ExperimentalSharedTransitionApi
-//import androidx.compose.animation.SharedTransitionLayout
-//import androidx.compose.animation.core.animateDp
-//import androidx.compose.foundation.layout.Box
-//import androidx.compose.foundation.layout.fillMaxSize
-//import androidx.compose.foundation.layout.padding
-//import androidx.compose.foundation.shape.RoundedCornerShape
-//import androidx.compose.runtime.Composable
-//import androidx.compose.runtime.CompositionLocalProvider
-//import androidx.compose.runtime.getValue
-//import androidx.compose.runtime.mutableStateOf
-//import androidx.compose.runtime.remember
-//import androidx.compose.runtime.setValue
-//import androidx.compose.ui.Alignment
-//import androidx.compose.ui.Modifier
-//import androidx.compose.ui.tooling.preview.Preview
-//import androidx.compose.ui.unit.dp
-//
+package android.learn.habitapp
+import android.learn.habitapp.navigation.HabitSharedElementKey
+import android.learn.habitapp.navigation.HabitSharedElementType
+import android.learn.habitapp.navigation.LocalAnimatedVisibilityScope
+import android.learn.habitapp.ui.HabitUiState
+import android.learn.habitapp.ui.theme.HabitAppTheme
+import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.animateDp
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+
 //@OptIn(ExperimentalSharedTransitionApi::class)
 //@Preview(showBackground = true, widthDp = 360, heightDp = 720)
 //@Composable
@@ -114,3 +113,21 @@ package android.learn.habitapp//package android.learn.habitapp
 //      }
 //   }
 //}
+
+@Preview
+@Composable
+fun ArchivableHabitRowPreview(
+
+) {
+   ArchivableHabitRow(
+      habitId = 0,
+      habitName= "Name",
+      isToggled= true,
+      emoji= "🎉",
+      onToggle= {},
+      onClickHabit= {},
+      onArchive= {},
+      modifier = Modifier
+   )
+
+}
