@@ -24,7 +24,8 @@ data class HabitUiState(
    val timesPerWeek: Int? = null,
    @Serializable(with = LocalTimeSerializer::class)
    val reminderTime: LocalTime? = null,
-   val color: Int? = null
+   val color: Int? = null,
+   val currentStreak: Int = 0
 )
 @Serializable
 data class SelectedHabit(

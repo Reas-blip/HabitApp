@@ -21,6 +21,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.SharedTransitionScope
@@ -46,6 +47,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -125,6 +127,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -147,7 +150,6 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -160,9 +162,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import dagger.hilt.android.AndroidEntryPoint
-import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.time.DayOfWeek
@@ -247,12 +249,6 @@ fun HabitEmojiPickerSheet(
       it.name == selectedCategory
    }
 
-   val filteredEmojis: List<HabitEmoji> = remember(
-      currentCategory, searchQuery
-   ) {
-      val items = HabitEmojiRepository.getByCategory(selectedCategory)
-      HabitEmojiRepository.search(searchQuery, items)
-   }
 
    val IosSnappySpring = spring<Dp>(
       dampingRatio = 0.75f,      // Bouncy enough to feel alive, tight enough to remain professional
@@ -276,6 +272,7 @@ fun HabitEmojiPickerSheet(
             modifier = Modifier.padding(bottom = 16.dp)
          )
          val focusManager = LocalFocusManager.current
+
          LazyRow(
             modifier = Modifier,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -292,7 +289,7 @@ fun HabitEmojiPickerSheet(
                   label = "SearchBarWidth"
                )
                // Track the scaling font size starting from a base value (e.g., 14sp or 16sp)
-               var currentFontSize by remember { mutableStateOf(14f) }
+               var currentFontSize by remember { mutableFloatStateOf(14f) }
                // Reset text size when query clears or focus shifts to avoid getting permanently stuck small
                LaunchedEffect(searchQuery) {
                   if (searchQuery.isEmpty()) currentFontSize = 14f
@@ -369,32 +366,41 @@ fun HabitEmojiPickerSheet(
                }, label = { Text("${category.icon} ${category.name}") })
             }
          }
-         LazyVerticalGrid(
-            modifier = Modifier
-               .height(300.dp)
-               .clickable(
-                  interactionSource = remember { MutableInteractionSource() }, indication = null
-               ) {
-                  focusManager.clearFocus()
-               },
-            columns = GridCells.Adaptive(56.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-         ) {
+         AnimatedContent(targetState = selectedCategory) { category ->
 
-            items(
-               filteredEmojis,
-               key = { it.emoji + it.keywords.joinToString() },
-            ) { emoji ->
+            val filteredEmojis: List<HabitEmoji> = remember(
+               category, searchQuery
+            ) {
+               val items = HabitEmojiRepository.getByCategory(selectedCategory)
+               HabitEmojiRepository.search(searchQuery, items)
+            }
+            LazyVerticalGrid(
+               modifier = Modifier
+                  .height(300.dp)
+                  .clickable(
+                     interactionSource = remember { MutableInteractionSource() }, indication = null
+                  ) {
+                     focusManager.clearFocus()
+                  },
+               columns = GridCells.Adaptive(56.dp),
+               horizontalArrangement = Arrangement.spacedBy(8.dp),
+               verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
 
-               FilledTonalIconButton(
-                  onClick = {
-                     onEmojiSelected(emoji.emoji)
-                     onCloseSheet()
-                  }) {
-                  Text(
-                     emoji.emoji, fontSize = 24.sp
-                  )
+               items(
+                  filteredEmojis,
+                  key = { it.emoji + it.keywords.joinToString() },
+               ) { emoji ->
+
+                  FilledTonalIconButton(
+                     onClick = {
+                        onEmojiSelected(emoji.emoji)
+                        onCloseSheet()
+                     }) {
+                     Text(
+                        emoji.emoji, fontSize = 24.sp
+                     )
+                  }
                }
             }
          }
@@ -502,6 +508,19 @@ fun HabitItemScreen(
             },
             onArchiveHabit = onArchiveHabit
          )
+         if (habit.currentStreak > 0) {
+            Row(
+               modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+               verticalAlignment = Alignment.CenterVertically
+            ) {
+               Text("🔥", style = MaterialTheme.typography.headlineSmall)
+               Spacer(Modifier.width(8.dp))
+               Column {
+                  Text("${habit.currentStreak} day streak", style = MaterialTheme.typography.titleMedium)
+                  Text("Keep it going!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+               }
+            }
+         }
 
          TextField(
             value = habit.name,
@@ -1160,9 +1179,12 @@ fun HabitList(
    onHabitsReordered: (List<Int>) -> Unit,
    onHabitItemClick: (Int) -> Unit,
 ) {
-   // Local mutable copy so drag feels instant, before the DB round-trip confirms
    var localOrder by remember(habitList) { mutableStateOf(habitList) }
    val lazyListState = rememberLazyListState()
+
+   // Stable reference to whichever habit was first from the SOURCE list —
+   // doesn't shift just because a drag temporarily reorders things.
+   val hintHabitId = remember(habitList) { habitList.firstOrNull()?.id }
 
    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
       localOrder = localOrder.toMutableList().apply {
@@ -1170,39 +1192,39 @@ fun HabitList(
       }
    }
 
-   LazyColumn(state = lazyListState) {
+   LazyColumn(state = lazyListState, modifier = Modifier.fillMaxHeight()) {
       items(localOrder, key = { habit -> habit.id }) { habit ->
          ReorderableItem(reorderableState, key = habit.id) { isDragging ->
-            val isFirst = localOrder.firstOrNull()?.id == habit.id
+            val isHintTarget = habit.id == hintHabitId // stable, no longer position-dependent
 
             val rowContent: @Composable (Modifier) -> Unit = { rowModifier ->
                ArchivableHabitRow(
                   habitId = habit.id,
                   habitName = habit.name,
+                  streak = habit.currentStreak,
                   isToggled = habit.isDoneToday,
                   emoji = habit.emoji,
                   onToggle = { onToggleHabitId(habit.id) },
                   onClickHabit = { onHabitItemClick(habit.id) },
                   onArchive = { onArchiveHabit(habit.id) },
-                  modifier = rowModifier
-                     .longPressDraggableHandle(
-                        onDragStopped = {
-                           onHabitsReordered(localOrder.map { it.id })
-                        }
-                     )
-                     .graphicsLayer {
-                        scaleX = if (isDragging) 1.03f else 1f
-                        scaleY = if (isDragging) 1.03f else 1f
-                        shadowElevation = if (isDragging) 8f else 0f
-                     }
+                  reorderableScope = this@ReorderableItem,
+                  onDragStopped = { onHabitsReordered(localOrder.map { it.id }) },
+                  isDragging = isDragging,
+                  modifier = rowModifier.graphicsLayer {
+                     scaleX = if (isDragging) 1.03f else 1f
+                     scaleY = if (isDragging) 1.03f else 1f
+                     shadowElevation = if (isDragging) 8f else 0f
+                  }
                )
             }
 
-            if (isFirst) {
+            if (isHintTarget) {
                SwipeHintOverlay(
                   hasSeenHint = hasSeenSwipeHint,
                   onHintShown = onHintShown
-               ) { hintModifier -> rowContent(hintModifier) }
+               ) { hintModifier ->
+                  rowContent(hintModifier)
+               }
             } else {
                rowContent(Modifier)
             }
@@ -1236,12 +1258,16 @@ fun SwipeHintOverlay(
 fun ArchivableHabitRow(
    habitId: Int,
    habitName: String,
+   streak: Int,
    isToggled: Boolean,
    emoji: String,
    onToggle: () -> Unit,
    onClickHabit: () -> Unit,
    onArchive: () -> Unit,
-   modifier: Modifier = Modifier
+   modifier: Modifier = Modifier,
+   reorderableScope: ReorderableCollectionItemScope,
+   onDragStopped: () -> Unit = {},
+   isDragging: Boolean
 ) {
    val dismissState = rememberSwipeToDismissBoxState(
       initialValue = SwipeToDismissBoxValue.Settled,
@@ -1293,8 +1319,7 @@ fun ArchivableHabitRow(
                      MaterialTheme.colorScheme.errorContainer,
                      RoundedCornerShape(20.dp)
                   )
-                  .clip(RoundedCornerShape(20.dp))
-                  ,
+                  .clip(RoundedCornerShape(20.dp)),
 
                verticalAlignment = Alignment.CenterVertically,
                horizontalArrangement = Arrangement.Center
@@ -1316,23 +1341,28 @@ fun ArchivableHabitRow(
          HabitRow(
             habitId = habitId,
             habitName = habitName,
+            streak = streak,
             isToggled = isToggled,
             emoji = emoji,
-            onToggle = onToggle,
-            onClickHabit = onClickHabit,
-            modifier = Modifier.sharedBounds(
-               sharedContentState = rememberSharedContentState(
-                  key = HabitSharedElementKey(
-                     habitId,
-                     type = HabitSharedElementType.Bounds
-                  )
-               ),
-               animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+            modifier = Modifier
 
-               clipInOverlayDuringTransition = OverlayClip(
-                  RoundedCornerShape(roundedCornerAnimation)
+               .sharedBounds(
+                  sharedContentState = rememberSharedContentState(
+                     key = HabitSharedElementKey(
+                        habitId,
+                        type = HabitSharedElementType.Bounds
+                     )
+                  ),
+                  animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+
+                  clipInOverlayDuringTransition = OverlayClip(
+                     RoundedCornerShape(roundedCornerAnimation)
+                  ),
                ),
-            )
+            onToggle = onToggle,
+            onClickHabit = onClickHabit, // ← the scope, threaded down
+            reorderableScope = reorderableScope,
+            onDragStopped = onDragStopped,
          )
       }
    }
@@ -1342,13 +1372,18 @@ fun ArchivableHabitRow(
 fun HabitRow(
    habitId: Int,
    habitName: String,
+   streak: Int,
    isToggled: Boolean,
    emoji: String,
 //   hazeState: HazeState,
-   onToggle: () -> Unit = {},
    modifier: Modifier = Modifier,
+   onToggle: () -> Unit = {},
    onClickHabit: () -> Unit = {},
+   reorderableScope: ReorderableCollectionItemScope,
+   onDragStopped: () -> Unit,
 ) {
+
+   val interactionSource = remember { MutableInteractionSource() }
    with(LocalSharedTransitionScope.current) {
       Row(
          modifier = Modifier
@@ -1362,8 +1397,21 @@ fun HabitRow(
 //         }
             .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
-            .clickable { onClickHabit() }
             .then(modifier)
+            .combinedClickable(
+               interactionSource = interactionSource,
+               indication = null, // avoid double ripple; row bg already provides feedback
+               onClick = { onClickHabit() },
+               onLongClick = { /* no-op: draggableHandle listens to the same source */ }
+            )
+            .then(
+               with(reorderableScope) {
+                  Modifier.longPressDraggableHandle(
+                     onDragStopped = onDragStopped
+                  )
+               }
+            )
+
             .padding(16.dp),
          verticalAlignment = Alignment.CenterVertically) {
          EmojiButton(
@@ -1384,6 +1432,14 @@ fun HabitRow(
          Text(
             text = habitName, style = MaterialTheme.typography.titleMedium
          )
+         if (streak > 0) {
+            Spacer(Modifier.width(6.dp))
+            Text(
+               text = "🔥 $streak",
+               style = MaterialTheme.typography.labelMedium,
+               color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+         }
          Spacer(modifier = Modifier.weight(.9f))
          IconButton(onClick = onToggle) {
             if (isToggled) {

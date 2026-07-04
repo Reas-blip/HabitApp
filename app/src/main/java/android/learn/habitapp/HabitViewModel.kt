@@ -76,7 +76,11 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
    val hasSeenSwipeHint: StateFlow<Boolean> = habitRepository.hasSeenSwipeHint
-      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true) // default true = don't show until loaded, avoids flash
+      .stateIn(
+         viewModelScope,
+         SharingStarted.WhileSubscribed(5000),
+         true
+      ) // default true = don't show until loaded, avoids flash
 
    fun markSwipeHintSeen() {
       viewModelScope.launch { habitRepository.setSwipeHintSeen() }
@@ -128,6 +132,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          habitRepository.archiveHabit(habitId)
       }
    }
+
    fun onDeleteHabit(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
 
@@ -141,11 +146,13 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
 
       return habitWithLogs.map {
          val habit = it.habit
+         val logDates = it.logs.map { log -> log.date }
          HabitUiState(
             id = habit.id,
             name = habit.name,
-            isDoneToday = it.logs.any { it.date == today },
-            emoji = habit.emoji
+            isDoneToday = it.logs.any { log -> log.date == today },
+            emoji = habit.emoji,
+            currentStreak = calculateCurrentStreak(logDates)
          )
       }
    }

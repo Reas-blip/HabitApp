@@ -57,6 +57,7 @@ class HabitDetailViewModel @Inject constructor(
          val habit = habitWithLogs.habit
          val today = getStartOfTodayTimestamp()
 
+         val logDates = habitWithLogs.logs.map { it.date }
          _uiState.value = HabitUiState(
             id = habit.id,
             name = habit.name,
@@ -70,7 +71,8 @@ class HabitDetailViewModel @Inject constructor(
                ?.toSet() ?: emptySet(),
             timesPerWeek = habit.timesPerWeek,
             reminderTime = habit.reminderTime?.let { LocalTime.parse(it) },
-            color = habit.color
+            color = habit.color,
+            currentStreak = calculateCurrentStreak(logDates)
          )
       }
    }
