@@ -1,5 +1,9 @@
 package android.learn.habitapp
 
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.learn.habitapp.data.emoji.HabitEmoji
 import android.learn.habitapp.data.emoji.HabitEmojiData
 import android.learn.habitapp.data.local.FrequencyType
@@ -14,12 +18,15 @@ import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
 import android.learn.habitapp.ui.theme.HabitAppTheme
 import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -56,12 +63,11 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -93,6 +99,10 @@ import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.ModeEditOutline
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.rounded.Save
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -142,20 +152,24 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
@@ -186,6 +200,13 @@ class MainActivity : ComponentActivity() {
          val navController = rememberNavController()
          HabitAppTheme {
 
+            LaunchedEffect(Unit) {
+               val habitId = intent.getIntExtra("openHabitId", -1)
+               if (habitId != -1) {
+                  habitViewModel.requestScrollTo(habitId)
+                  // no navigation needed — HabitList is already the start destination
+               }
+            }
             val viewModel: HabitDetailViewModel = hiltViewModel()
             NavHost(
                navController = navController,
@@ -218,11 +239,21 @@ class MainActivity : ComponentActivity() {
                      coroutineScope.launch {
                         delay(50)
                         navController.popBackStack()
+
                      }
                   }
                }
             }
          }
+      }
+   }
+
+   override fun onNewIntent(intent: Intent) {
+      super.onNewIntent(intent)
+      setIntent(intent)
+      val habitId = intent.getIntExtra("openHabitId", -1)
+      if (habitId != -1) {
+         habitViewModel.requestScrollTo(habitId)
       }
    }
 }
@@ -414,9 +445,11 @@ fun HabitItemRoute(
    habitId: Int,
    onBack: () -> Unit,
 ) {
-   val uiState by viewModel.uiState.collectAsState()
+   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+   val uiStateHasChanged by viewModel.uiStateHasChanged.collectAsStateWithLifecycle()
 
    var hasNavigatedBack by remember { mutableStateOf(false) }
+   val context: Context = LocalContext.current
    Surface(
       Modifier.fillMaxSize()
    ) {
@@ -424,6 +457,7 @@ fun HabitItemRoute(
 
       HabitItemScreen(
          uiState,
+         stateHasChanged = uiStateHasChanged,
          onNameChange = viewModel::onNameChanged,
          onEmojiChange = viewModel::onEmojiChanged,
          onReminderTimeChange = viewModel::onReminderTimeChanged,
@@ -431,7 +465,13 @@ fun HabitItemRoute(
          onCustomDaysChange = viewModel::onCustomDaysChanged,
          onTimesPerWeekChange = viewModel::onTimesPerWeekChanged,
          onArchiveHabit = { viewModel.archiveHabit { onBack() } },
-         onSave = { viewModel.saveHabit { onBack() } },
+         onSave = {
+            viewModel.saveHabit { onBack() }
+            viewModel.resetUiStateHasChanged()
+         },
+         onRequestExactAlarmPermission = { viewModel.requestExactAlarmPermission(context) },
+         canScheduleExactAlarms = viewModel::canScheduleExactAlarms,
+         onResetStateHasChanged = viewModel::resetUiStateHasChanged,
       ) {
          if (!hasNavigatedBack) {
             hasNavigatedBack = true
@@ -443,18 +483,50 @@ fun HabitItemRoute(
 
 }
 
+@Composable
+fun NotificationPermissionHandler(
+   onPermissionResult: (Boolean) -> Unit
+) {
+   val context = LocalContext.current
+   val launcher = rememberLauncherForActivityResult(
+      contract = ActivityResultContracts.RequestPermission(),
+      onResult = onPermissionResult
+   )
+
+   LaunchedEffect(Unit) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+         val granted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.POST_NOTIFICATIONS
+         ) == PackageManager.PERMISSION_GRANTED
+
+         if (!granted) {
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+         } else {
+            onPermissionResult(true)
+         }
+      } else {
+         onPermissionResult(true) // not needed below API 33
+      }
+   }
+}
+
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun HabitItemScreen(
    habit: HabitUiState,
+   stateHasChanged: Boolean,
    onNameChange: (String) -> Unit,
    onEmojiChange: (String) -> Unit,
-   modifier: Modifier = Modifier,
    onReminderTimeChange: (LocalTime?) -> Unit,
+   canScheduleExactAlarms: () -> Boolean,      // ← new param
+   onRequestExactAlarmPermission: () -> Unit,
    onFrequencyTypeChange: (FrequencyType) -> Unit,
    onCustomDaysChange: (Set<DayOfWeek>) -> Unit,
    onTimesPerWeekChange: (Int) -> Unit,
    onArchiveHabit: () -> Unit,
+   modifier: Modifier = Modifier,
+   onResetStateHasChanged: () -> Unit,
    onSave: () -> Unit,
    onBack: () -> Unit,
 ) {
@@ -463,8 +535,7 @@ fun HabitItemScreen(
    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
    var showEmojiPicker by remember { mutableStateOf(false) }
    val focusManager = LocalFocusManager.current
-   var clickTriggeredSheetOpen by remember { mutableStateOf(false) }
-   val isKeyboardVisible = WindowInsets.isImeVisible
+   var showSaveDialog by remember { mutableStateOf(false) }
    val roundedCornerAnimation by LocalAnimatedVisibilityScope.current.transition.animateDp(label = "rounded corner") { enterExit ->
       when (enterExit) {
          EnterExitState.PreEnter -> 20.dp
@@ -496,8 +567,12 @@ fun HabitItemScreen(
          HabitItemTopAppBar(
             habit.id,
             habit.emoji, onBackPressed = {
-               focusManager.clearFocus()
-               onBack()
+               if (!stateHasChanged) {
+                  focusManager.clearFocus()
+                  onBack()
+               } else {
+                  showSaveDialog = true
+               }
             }, onEditIcon = {
                focusManager.clearFocus()
                showEmojiPicker = true
@@ -516,8 +591,15 @@ fun HabitItemScreen(
                Text("🔥", style = MaterialTheme.typography.headlineSmall)
                Spacer(Modifier.width(8.dp))
                Column {
-                  Text("${habit.currentStreak} day streak", style = MaterialTheme.typography.titleMedium)
-                  Text("Keep it going!", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                  Text(
+                     "${habit.currentStreak} day streak",
+                     style = MaterialTheme.typography.titleMedium
+                  )
+                  Text(
+                     "Keep it going!",
+                     style = MaterialTheme.typography.bodySmall,
+                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                  )
                }
             }
          }
@@ -563,7 +645,9 @@ fun HabitItemScreen(
 
          ReminderPicker(
             reminderTime = habit.reminderTime,
-            onReminderChange = onReminderTimeChange
+            onReminderChange = onReminderTimeChange,
+            canScheduleExactAlarms = canScheduleExactAlarms,
+            onRequestExactAlarmPermission = onRequestExactAlarmPermission,
          )
 
       }
@@ -576,6 +660,31 @@ fun HabitItemScreen(
 //            clickTriggeredSheetOpen = false // Reset trigger
 //         }
 //      }
+   BackHandler(enabled = stateHasChanged) {
+      showSaveDialog = true
+   }
+
+   val onDiscardRequest: () -> Unit = {
+      onResetStateHasChanged()
+      showSaveDialog = false
+      onBack()
+   }
+   val onDialogSave: () -> Unit = {
+      onResetStateHasChanged()
+      showSaveDialog = false
+      onSave()
+   }
+   val onCancel: () -> Unit = { showSaveDialog = false }
+   if (showSaveDialog) {
+      ConfirmSaveDialog(
+         onDiscardRequest = onDiscardRequest,
+         onCancel = onCancel,
+         onSave = onDialogSave,
+         dialogTitle = "Discard Changes?",
+         dialogText = "Are you sure you want to discard your changes?",
+         icon = Icons.Outlined.Save
+      )
+   }
    if (showEmojiPicker) {
 
       HabitEmojiPickerSheet(
@@ -595,6 +704,91 @@ fun HabitItemScreen(
                }
             }
          })
+   }
+
+}
+
+@Composable
+fun ConfirmSaveDialog(
+   onDiscardRequest: () -> Unit,
+   onCancel: () -> Unit,
+   onSave: () -> Unit,
+   dialogTitle: String,
+   dialogText: String,
+   icon: ImageVector,
+) {
+   Dialog(onDismissRequest = { onCancel() }) {
+      Card(
+         modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+         shape = RoundedCornerShape(16.dp),
+      ) {
+         Column(
+            modifier = Modifier
+               .fillMaxWidth()
+               .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+         ) {
+            Icon(imageVector = icon, contentDescription = "Save Dialog Icon")
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+               text = dialogTitle,
+               style = MaterialTheme.typography.titleLarge,
+               maxLines = 1,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+               text = dialogText,
+               style = MaterialTheme.typography.bodyMedium,
+               textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Primary action full-width, like a system dialog's main button
+            Button(
+               onClick = { onSave() },
+               modifier = Modifier.fillMaxWidth(),
+            ) {
+               Text("Save")
+            }
+
+            Row(
+               modifier = Modifier.fillMaxWidth(),
+               horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+
+               Button(
+                  onClick = { onCancel() }, shape = RoundedCornerShape(
+                     topStartPercent = 50,
+                     topEndPercent = 15,
+                     bottomEndPercent = 15,
+                     bottomStartPercent = 50,
+                  ), modifier = Modifier.weight(.45f)
+               ) {
+                  Text("Cancel")
+               }
+               Spacer(Modifier.width(8.dp))
+               Button(
+                  onClick = { onDiscardRequest() }, shape = RoundedCornerShape(
+                     topStartPercent = 15,
+                     topEndPercent = 50,
+                     bottomEndPercent = 50,
+                     bottomStartPercent = 15,
+                  ), modifier = Modifier.weight(.45f)
+               ) {
+                  Text("Discard")
+               }
+
+            }
+
+         }
+      }
    }
 }
 
@@ -755,6 +949,7 @@ fun HabitMainScreen(
       }
    }
 
+   val scrollToHabitId by habitViewModel.scrollToHabitId.collectAsStateWithLifecycle()
    var isSearchExpanded by remember { mutableStateOf(false) }
    val focusManager = LocalFocusManager.current
    val animationDuration = 200
@@ -861,30 +1056,32 @@ fun HabitMainScreen(
                      color = Color.Gray
                   )
                } else {
+
                   with(LocalSharedTransitionScope.current)
                   {
+
                      LazyColumn(modifier = Modifier.fillMaxWidth()) {
                         items(filteredHabits, key = { it.id }) { habit ->
+                           val searchHabitId = habit.id
                            Row(
                               modifier = Modifier
                                  .fillMaxWidth()
                                  .clickable {
-                                    onHabitClicked(habit.id)
-//                                 isSearchExpanded = false
+                                    habitViewModel.requestScrollTo(habit.id) // ← new: same mechanism as notifications
+                                    onHabitClicked(searchHabitId)
+                                    isSearchExpanded = false
 //                                 habitViewModel.onSearchQueryChange("")
 //                                 focusManager.clearFocus()
                                  }
                                  .sharedBounds(
                                     sharedContentState = rememberSharedContentState(
                                        key = HabitSharedElementKey(
-                                          habit.id,
+                                          searchHabitId,
                                           type = HabitSharedElementType.Bounds
                                        )
                                     ),
                                     animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
-
-
-                                    )
+                                 )
                                  .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                               Icon(
                                  imageVector = Icons.Default.Bolt,
@@ -905,29 +1102,29 @@ fun HabitMainScreen(
                .fillMaxWidth()
                .weight(1f)
          ) {
-            if (!isSearchExpanded) {  // Layer 1: Regular habit elements list
-               when (habitUiState) {
-                  is UiState.Success -> HabitList(
-                     habits,
-                     onToggleHabitId = { habitId ->
-                        habitViewModel.onHabitChecked(habitId)
-                     },
-                     hasSeenSwipeHint = hasSeenSwipeHint,
-                     onHintShown = habitViewModel::markSwipeHintSeen,
-                     onArchiveHabit = { habitId ->
-                        habitViewModel.onArchiveHabit(habitId)
-                     },
-                     onHabitsReordered = { habitList -> habitViewModel.onHabitsReordered(habitList) }
-                  ) { habitId ->
-                     onHabitClicked(
-                        habitId
-                     )
-                  }
-
-                  is UiState.Loading -> LoadingSpinner()
-
-                  is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
+            when (habitUiState) {
+               is UiState.Success -> HabitList(
+                  habitList = habits,
+                  scrollToHabitId = scrollToHabitId,
+                  onScrollHandled = habitViewModel::onScrollHandled,
+                  hasSeenSwipeHint = hasSeenSwipeHint,
+                  onHintShown = habitViewModel::markSwipeHintSeen,
+                  onToggleHabitId = { habitId ->
+                     habitViewModel.onHabitChecked(habitId)
+                  },
+                  onArchiveHabit = { habitId ->
+                     habitViewModel.onArchiveHabit(habitId)
+                  },
+                  onHabitsReordered = { habitList -> habitViewModel.onHabitsReordered(habitList) }
+               ) { habitId ->
+                  onHabitClicked(
+                     habitId
+                  )
                }
+
+               is UiState.Loading -> LoadingSpinner()
+
+               is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
             }
 
             // Layer 2: Blackout scrim to blur/hide the list background layout when searching
@@ -1172,6 +1369,8 @@ fun SearchHabitBar(
 @Composable
 fun HabitList(
    habitList: List<HabitUiState>,
+   scrollToHabitId: Int?,
+   onScrollHandled: () -> Unit,
    hasSeenSwipeHint: Boolean,
    onHintShown: () -> Unit,
    onToggleHabitId: (habitId: Int) -> Unit,
@@ -1182,6 +1381,21 @@ fun HabitList(
    var localOrder by remember(habitList) { mutableStateOf(habitList) }
    val lazyListState = rememberLazyListState()
 
+
+   LaunchedEffect(scrollToHabitId, localOrder) {
+      if (scrollToHabitId != null) {
+         val index = localOrder.indexOfFirst { it.id == scrollToHabitId }
+         if (index != -1) {
+            val isAlreadyVisible = lazyListState.layoutInfo.visibleItemsInfo
+               .any { it.index == index }
+
+            if (!isAlreadyVisible) {
+               lazyListState.animateScrollToItem(index)
+            }
+            onScrollHandled()
+         }
+      }
+   }
    // Stable reference to whichever habit was first from the SOURCE list —
    // doesn't shift just because a drag temporarily reorders things.
    val hintHabitId = remember(habitList) { habitList.firstOrNull()?.id }
@@ -1467,15 +1681,25 @@ fun HabitRow(
 fun ReminderPicker(
    reminderTime: LocalTime?,
    onReminderChange: (LocalTime?) -> Unit,
+   canScheduleExactAlarms: () -> Boolean,      // ← new param
+   onRequestExactAlarmPermission: () -> Unit,
    modifier: Modifier = Modifier
 ) {
    var showPicker by remember { mutableStateOf(false) }
 
+   var showPermissionRequest by remember { mutableStateOf(false) }
+
+   if (showPermissionRequest) {
+      NotificationPermissionHandler { granted ->
+         showPermissionRequest = false
+         showPicker = true // open the time picker regardless of the result
+      }
+   }
    Row(
       modifier = modifier
          .fillMaxWidth()
          .padding(horizontal = 16.dp, vertical = 8.dp)
-         .clickable { showPicker = true },
+         .clickable { showPermissionRequest = true },
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween
    ) {
@@ -1527,6 +1751,10 @@ fun ReminderPicker(
                   TextButton(onClick = {
                      onReminderChange(LocalTime.of(timePickerState.hour, timePickerState.minute))
                      showPicker = false
+
+                     if (!canScheduleExactAlarms()) {
+                        onRequestExactAlarmPermission()
+                     }
                   }) { Text("Set") }
                }
             }
@@ -1649,9 +1877,3 @@ private fun TimesPerWeekStepper(
 }
 
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-   Text(
-      text = "Hello $name!", modifier = modifier
-   )
-}

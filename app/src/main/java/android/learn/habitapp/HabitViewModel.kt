@@ -81,7 +81,16 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          SharingStarted.WhileSubscribed(5000),
          true
       ) // default true = don't show until loaded, avoids flash
+   private val _scrollToHabitId = MutableStateFlow<Int?>(null)
+   val scrollToHabitId = _scrollToHabitId.asStateFlow()
 
+   fun requestScrollTo(habitId: Int) {
+      _scrollToHabitId.value = habitId
+   }
+
+   fun onScrollHandled() {
+      _scrollToHabitId.value = null
+   }
    fun markSwipeHintSeen() {
       viewModelScope.launch { habitRepository.setSwipeHintSeen() }
    }
