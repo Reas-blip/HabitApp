@@ -15,6 +15,7 @@ interface HabitDao {
    @Insert(onConflict = OnConflictStrategy.REPLACE)
    suspend fun insertHabit(habit: HabitEntity)
 
+
    @Update
    suspend fun updateHabit(habit: HabitEntity)
 
@@ -35,11 +36,17 @@ interface HabitDao {
    fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>
 
    @Transaction
+   @Query("SELECT * from habits WHERE isArchived = 1 ORDER BY sortOrder ASC")
+   fun getArchivedHabitsWithLogs(): Flow<List<HabitWithLogs>>
+   @Transaction
    @Query("SELECT * from habits WHERE id = :habitId")
    suspend fun loadHabitWithLogs(habitId: Int): HabitWithLogs
 
    @Query("UPDATE habits SET isArchived = 1 WHERE id = :habitId")
    suspend fun archiveHabit(habitId: Int)
+
+   @Query("UPDATE habits SET isArchived = 0 WHERE id = :habitId")
+   suspend fun unarchiveHabit(habitId: Int)
 
    @Query("UPDATE habits SET sortOrder = :newOrder WHERE id = :habitId")
    suspend fun updateSortOrder(habitId: Int, newOrder: Int)

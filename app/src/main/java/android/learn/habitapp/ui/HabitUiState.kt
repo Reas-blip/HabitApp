@@ -20,12 +20,14 @@ data class HabitUiState(
    val emoji: String,
    val isDoneToday: Boolean,
    val frequencyType: FrequencyType = FrequencyType.DAILY,
+   val isArchived: Boolean,
    val customDays: Set<DayOfWeek> = emptySet(),
    val timesPerWeek: Int? = null,
    @Serializable(with = LocalTimeSerializer::class)
    val reminderTime: LocalTime? = null,
    val color: Int? = null,
-   val currentStreak: Int = 0
+   val currentStreak: Int = 0,
+   val sortOrder: Int = 0
 )
 @Serializable
 data class SelectedHabit(

@@ -9,6 +9,10 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 interface HabitRepository {
+   // HabitRepository
+   suspend fun unarchiveHabit(habitId: Int)
+
+
    suspend fun insertHabit(habit: HabitEntity)
    suspend fun updateHabit(habit: HabitEntity)
    suspend fun updateSortOrders(idsInOrder: List<Int>)
@@ -24,6 +28,7 @@ interface HabitRepository {
 
    fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>
 
+   fun getArchivedHabitsWithLogs(): Flow<List<HabitWithLogs>>
    suspend fun loadHabitWithLogs(habitId: Int): HabitWithLogs
 
    suspend fun archiveHabit(habitId: Int)
@@ -76,12 +81,20 @@ class HabitRepositoryImpl @Inject constructor(
       return habitDao.getHabitsWithLogs()
    }
 
+   override fun getArchivedHabitsWithLogs(): Flow<List<HabitWithLogs>> {
+      return habitDao.getArchivedHabitsWithLogs()
+   }
+
    override suspend fun loadHabitWithLogs(habitId: Int): HabitWithLogs {
       return habitDao.loadHabitWithLogs(habitId)
    }
 
    override suspend fun archiveHabit(habitId: Int) {
       habitDao.archiveHabit(habitId)
+   }
+
+   override suspend fun unarchiveHabit(habitId: Int) {
+      habitDao.unarchiveHabit(habitId)
    }
 
    override suspend fun updateSortOrder(habitId: Int, newOrder: Int) {

@@ -33,7 +33,7 @@ class HabitDetailViewModel @Inject constructor(
    private val habitId: Int? = savedStateHandle.toRoute<HabitDetail>().habitId
    private val _uiState = MutableStateFlow(
       HabitUiState(
-         id = -1, name = "", emoji = "🎯", isDoneToday = false
+         id = -1, name = "", emoji = "🎯", isDoneToday = false, isArchived = false
       )
    )
    val uiState = _uiState.asStateFlow()
@@ -58,7 +58,7 @@ class HabitDetailViewModel @Inject constructor(
    }
 
    fun newHabit() {
-      _uiState.update { it.copy(id = -1, name = "", emoji = "🎯", isDoneToday = false) }
+      _uiState.update { it.copy(id = -1, name = "", emoji = "🎯", isDoneToday = false, reminderTime = null) }
    }
 
    fun loadHabit(id: Int) {
@@ -72,6 +72,8 @@ class HabitDetailViewModel @Inject constructor(
             id = habit.id,
             name = habit.name,
             emoji = habit.emoji,
+            isArchived = habit.isArchived,
+            sortOrder = habit.sortOrder,
             isDoneToday = habitWithLogs.logs.any { today == it.date },
             frequencyType = habit.frequencyType,
             customDays = habit.customDays?.split(",")?.filter { it.isNotBlank() }
@@ -79,7 +81,7 @@ class HabitDetailViewModel @Inject constructor(
             timesPerWeek = habit.timesPerWeek,
             reminderTime = habit.reminderTime?.let { LocalTime.parse(it) },
             color = habit.color,
-            currentStreak = calculateCurrentStreak(logDates)
+            currentStreak = calculateCurrentStreak(logDates),
          )
       }
    }
@@ -92,6 +94,7 @@ class HabitDetailViewModel @Inject constructor(
                id = if (state.id == -1) 0 else state.id, // 0 lets Room autogenerate on insert
                name = state.name,
                emoji = state.emoji,
+               sortOrder = state.sortOrder,
                frequencyType = state.frequencyType,
                customDays = state.customDays.takeIf { it.isNotEmpty() }
                   ?.joinToString(",") { it.name },
@@ -146,9 +149,11 @@ class HabitDetailViewModel @Inject constructor(
       _uiState.customUpdate { it.copy(name = name) }
    }
 
+   fun onColorChanged(color: Int?) {
+      _uiState.customUpdate { it.copy(color = color) }
+   }
    fun onEmojiChanged(emoji: String) {
       _uiState.customUpdate { it.copy(emoji = emoji) }
-
    }
 
    fun onFrequencyTypeChanged(type: FrequencyType) {

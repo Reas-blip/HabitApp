@@ -1,18 +1,14 @@
 package android.learn.habitapp
 
-import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.local.HabitLogsEntity
 import android.learn.habitapp.data.local.HabitWithLogs
 import android.learn.habitapp.data.repository.HabitRepository
 import android.learn.habitapp.ui.HabitUiState
-import android.learn.habitapp.ui.SelectedHabit
 import android.learn.habitapp.ui.UiState
-import androidx.compose.ui.geometry.Rect
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,7 +20,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -40,8 +38,15 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    private val _uiEvent = MutableSharedFlow<UiEvent>()
    val uiEvent = _uiEvent.asSharedFlow()
 
-   // 1. The Source of Truth (Database-backed)
-   // We update this ONLY when the database changes
+   val archivedHabitUiState: StateFlow<UiState> = habitRepository.getArchivedHabitsWithLogs()
+      .map { rawData ->
+         UiState.Success(transformToUiState(rawData))
+      }
+      .stateIn(
+         scope = viewModelScope,
+         started = SharingStarted.WhileSubscribed(5000), // Automatically stops listening if user leaves the screen
+         initialValue = UiState.Loading // The default state while the database loads
+      )
 
    val habitUiState: StateFlow<UiState> = habitRepository.getHabitsWithLogs()
       .map { rawData ->
@@ -88,6 +93,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       _scrollToHabitId.value = habitId
    }
 
+
    fun onScrollHandled() {
       _scrollToHabitId.value = null
    }
@@ -105,8 +111,10 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       return@withContext HabitUiState(
          id = habit.id,
          name = habit.name,
+         emoji = habit.emoji,
          isDoneToday = true,
-         emoji = habit.emoji
+         sortOrder = 1,
+         isArchived = habit.isArchived
       )
    }
 
@@ -142,6 +150,12 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }
 
+   fun onUndoArchive(habitId: Int) {
+      viewModelScope.launch {
+         habitRepository.unarchiveHabit(habitId)
+      }
+   }
+
    fun onDeleteHabit(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
 
@@ -153,15 +167,24 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    private fun transformToUiState(habitWithLogs: List<HabitWithLogs>): List<HabitUiState> {
       val today = getStartOfTodayTimestamp()
 
-      return habitWithLogs.map {
-         val habit = it.habit
-         val logDates = it.logs.map { log -> log.date }
+      return habitWithLogs.map { habitWithLogs ->
+         val habit = habitWithLogs.habit
+         val logDates = habitWithLogs.logs.map { log -> log.date }
          HabitUiState(
             id = habit.id,
             name = habit.name,
-            isDoneToday = it.logs.any { log -> log.date == today },
             emoji = habit.emoji,
+            isArchived = habit.isArchived,
+            isDoneToday = habitWithLogs.logs.any { today == it.date },
+            sortOrder = habit.sortOrder,
+            frequencyType = habit.frequencyType,
+            customDays = habit.customDays?.split(",")?.filter { it.isNotBlank() }
+               ?.map { DayOfWeek.valueOf(it) }?.toSet() ?: emptySet(),
+            timesPerWeek = habit.timesPerWeek,
+            reminderTime = habit.reminderTime?.let { LocalTime.parse(it) },
+            color = habit.color,
             currentStreak = calculateCurrentStreak(logDates)
+
          )
       }
    }
