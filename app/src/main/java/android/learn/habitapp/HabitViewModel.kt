@@ -48,6 +48,8 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          initialValue = UiState.Loading // The default state while the database loads
       )
 
+   private val _colorFilter = MutableStateFlow<Int?>(null)
+   val colorFilter = _colorFilter.asStateFlow()
    val habitUiState: StateFlow<UiState> = habitRepository.getHabitsWithLogs()
       .map { rawData ->
          UiState.Success(transformToUiState(rawData))
@@ -57,6 +59,22 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          started = SharingStarted.WhileSubscribed(5000), // Automatically stops listening if user leaves the screen
          initialValue = UiState.Loading // The default state while the database loads
       )
+
+   val displayedHabitUiState: StateFlow<UiState> = combine(
+      habitUiState,
+      _colorFilter
+   ) { rawState, filterColor ->
+      if (rawState is UiState.Success) {
+         val habits = rawState.habits
+         if (filterColor == null) {
+            UiState.Success(habits)
+         } else {
+            UiState.Success(habits.filter { it.color == filterColor })
+         }
+      } else {
+         rawState
+      }
+   }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
    // 2. The Search Query
    private val _searchQuery = MutableStateFlow("")
@@ -89,6 +107,11 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    private val _scrollToHabitId = MutableStateFlow<Int?>(null)
    val scrollToHabitId = _scrollToHabitId.asStateFlow()
 
+
+   fun onColorFilterChanged(color: Int?) {
+      // Tapping the already-selected color again clears the filter
+      _colorFilter.value = if (_colorFilter.value == color) null else color
+   }
    fun requestScrollTo(habitId: Int) {
       _scrollToHabitId.value = habitId
    }

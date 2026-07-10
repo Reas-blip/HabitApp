@@ -19,6 +19,7 @@ import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -290,7 +291,6 @@ fun NotificationPermissionHandler(
 }
 
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HabitItemTopAppBar(
@@ -463,12 +463,13 @@ fun DrawerNavigation(
             HabitMainScreen(
                habitViewModel = habitViewModel,
                onCreateHabit = {
-                 detailViewModel.newHabit()
-                 navController.navigate(HabitDetail())
+                  detailViewModel.newHabit()
+                  navController.navigate(HabitDetail())
                },
                onHabitClicked = { habitId ->
                   detailViewModel.loadHabit(habitId)
-                  navController.navigate(HabitDetail(habitId)) },
+                  navController.navigate(HabitDetail(habitId))
+               },
                screenTitle = "Habits",
                onMenuClick = onMenuClick
             )
@@ -478,7 +479,8 @@ fun DrawerNavigation(
             ArchiveScreen(
                habitViewModel = habitViewModel,
                screenTitle = "Archived Habits",
-               onMenuClick = onMenuClick)
+               onMenuClick = onMenuClick
+            )
          }
 
          animatedComposable<HabitDetail> { backStackEntry ->
@@ -675,6 +677,21 @@ fun HabitItemScreen(
       }
 
    }
+   val context: Context = LocalContext.current
+   val onSave: () -> Unit = {
+      if (habit.name.isEmpty()) {
+         Toast
+            .makeText(
+               context,
+               "Please include the name of the habit",
+               Toast.LENGTH_LONG
+            )
+            .show()
+      } else {
+         focusManager.clearFocus()
+         onSave() // If your onSave doesn't trigger navigation automatically, call safeNavigateBack() here too.
+      }
+   }
    with(LocalSharedTransitionScope.current) {
       Column(
          Modifier
@@ -694,6 +711,7 @@ fun HabitItemScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
       ) {
+
          HabitItemTopAppBar(
             habit.id, habit.emoji, onBackPressed = {
                if (!stateHasChanged) {
@@ -706,10 +724,7 @@ fun HabitItemScreen(
                focusManager.clearFocus()
                showEmojiPicker = true
 
-            }, onSaveHabit = {
-               focusManager.clearFocus()
-               onSave() // If your onSave doesn't trigger navigation automatically, call safeNavigateBack() here too.
-            }, onArchiveHabit = onArchiveHabit
+            }, onSaveHabit = onSave, onArchiveHabit = onArchiveHabit
          )
          if (habit.currentStreak > 0) {
             Row(
@@ -950,7 +965,8 @@ private fun MainBodyContent(
             availableColors = availableColors,
             selectedColor = colorFilter,
             onColorSelected = { habitViewModel.onColorFilterChanged(it) }
-         )}
+         )
+      }
       when (habitUiState) {
          is UiState.Success -> HabitList(
             habitList = displayedHabits,
@@ -1323,6 +1339,7 @@ fun ColorFilterRow(
       }
    }
 }
+
 @Composable
 fun ConfirmSaveDialog(
    onDiscardRequest: () -> Unit,
@@ -1644,7 +1661,8 @@ fun ArchivableHabitRow(
                   .padding(end = 8.dp)
                   .fillMaxSize()
                   .background(
-                     if (isArchived) Color.Green else MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(20.dp)
+                     if (isArchived) Color.Green else MaterialTheme.colorScheme.errorContainer,
+                     RoundedCornerShape(20.dp)
                   )
                   .clip(RoundedCornerShape(20.dp)),
 
