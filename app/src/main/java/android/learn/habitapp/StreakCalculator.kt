@@ -1,6 +1,5 @@
 package android.learn.habitapp
 
-// StreakCalculator.kt
 fun calculateCurrentStreak(logDates: List<Long>): Int {
    if (logDates.isEmpty()) return 0
 

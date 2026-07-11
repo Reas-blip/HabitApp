@@ -7,22 +7,16 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.learn.habitapp.MainActivity
-import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.repository.HabitRepository
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import java.time.LocalTime
-import javax.inject.Inject
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.time.DayOfWeek
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.ZonedDateTime
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class ReminderReceiver : BroadcastReceiver() {

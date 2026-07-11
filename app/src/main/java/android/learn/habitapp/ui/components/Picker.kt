@@ -1,9 +1,10 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.components
 
 import android.learn.habitapp.data.emoji.HabitEmoji
 import android.learn.habitapp.data.emoji.HabitEmojiData
 import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.repository.HabitEmojiRepository
+import android.learn.habitapp.permissions.NotificationPermissionHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState

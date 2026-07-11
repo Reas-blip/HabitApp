@@ -2,8 +2,6 @@ package android.learn.habitapp.data.repository
 
 import android.learn.habitapp.data.emoji.HabitEmoji
 import android.learn.habitapp.data.emoji.HabitEmojiData
-import android.learn.habitapp.data.emoji.HabitEmojiData.categories
-import kotlin.collections.filter
 
 object HabitEmojiRepository {
 

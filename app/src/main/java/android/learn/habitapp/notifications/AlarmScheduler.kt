@@ -1,24 +1,18 @@
 package android.learn.habitapp.notifications
 
-import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.local.HabitEntity
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.DayOfWeek
-import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.ZonedDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.jvm.java
 
 @Singleton
 class AlarmScheduler @Inject constructor(
