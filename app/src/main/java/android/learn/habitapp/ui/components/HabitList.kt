@@ -245,7 +245,7 @@ fun ArchivableHabitRow(
                   .padding(end = 8.dp)
                   .fillMaxSize()
                   .background(
-                     if (isArchived) Color.Green else MaterialTheme.colorScheme.errorContainer,
+                     if (isArchived) Color(0xFF19C760) else MaterialTheme.colorScheme.errorContainer,
                      RoundedCornerShape(20.dp)
                   )
                   .clip(RoundedCornerShape(20.dp)),
@@ -253,13 +253,15 @@ fun ArchivableHabitRow(
                verticalAlignment = Alignment.CenterVertically,
                horizontalArrangement = Arrangement.Center
             ) {
-               Icon(
-                  imageVector = if (isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
-                  contentDescription = if (isArchived) "UnArchive" else "Archive",
-                  tint = MaterialTheme.colorScheme.onErrorContainer,
-                  modifier = Modifier.graphicsLayer {
-                     alpha = dismissState.progress
-                  })
+               if (revealedWidth > 40.dp) {
+                  Icon(
+                     imageVector = if (isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
+                     contentDescription = if (isArchived) "UnArchive" else "Archive",
+                     tint = MaterialTheme.colorScheme.onErrorContainer,
+                     modifier = Modifier.graphicsLayer {
+                        alpha = dismissState.progress
+                     })
+               }
             }
          }
       }) {

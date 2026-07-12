@@ -26,7 +26,6 @@ import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
 
-// Simple sealed class to hold your events
 sealed class UiEvent {
    data class ShowError(val message: String) : UiEvent()
 }
@@ -44,8 +43,8 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
       .stateIn(
          scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000), // Automatically stops listening if user leaves the screen
-         initialValue = UiState.Loading // The default state while the database loads
+         started = SharingStarted.WhileSubscribed(5000),
+         initialValue = UiState.Loading
       )
 
    private val _colorFilter = MutableStateFlow<Int?>(null)
@@ -56,8 +55,8 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
       .stateIn(
          scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000), // Automatically stops listening if user leaves the screen
-         initialValue = UiState.Loading // The default state while the database loads
+         started = SharingStarted.WhileSubscribed(5000),
+         initialValue = UiState.Loading
       )
 
    val displayedHabitUiState: StateFlow<UiState> = combine(
@@ -76,12 +75,9 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       }
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
-   // 2. The Search Query
    private val _searchQuery = MutableStateFlow("")
    val searchQuery = _searchQuery.asStateFlow()
 
-   // 3. The Filtered View: filters according the searchQuery
-   // This is derived automatically from the two inputs above.
    val filteredHabitUiState: StateFlow<UiState> = combine(
       habitUiState,
       _searchQuery
@@ -94,7 +90,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
             UiState.Success(habits.filter { it.name.contains(query, ignoreCase = true) })
          }
       } else {
-         rawState // Pass through Loading or Error states
+         rawState
       }
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
@@ -103,13 +99,13 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          viewModelScope,
          SharingStarted.WhileSubscribed(5000),
          true
-      ) // default true = don't show until loaded, avoids flash
+      )
    private val _scrollToHabitId = MutableStateFlow<Int?>(null)
    val scrollToHabitId = _scrollToHabitId.asStateFlow()
 
 
    fun onColorFilterChanged(color: Int?) {
-      // Tapping the already-selected color again clears the filter
+
       _colorFilter.value = if (_colorFilter.value == color) null else color
    }
    fun requestScrollTo(habitId: Int) {
@@ -128,19 +124,6 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       _searchQuery.value = newQuery
    }
 
-   suspend fun loadHabit(habitId: Int): HabitUiState = withContext(Dispatchers.IO) {
-//      val habit = HabitEntity("")
-      val habit = habitRepository.load(habitId)
-      return@withContext HabitUiState(
-         id = habit.id,
-         name = habit.name,
-         emoji = habit.emoji,
-         isDoneToday = true,
-         sortOrder = 1,
-         isArchived = habit.isArchived
-      )
-   }
-
    fun onHabitChecked(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
          try {
@@ -156,8 +139,6 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          } catch (e: Exception) {
             _uiEvent.emit(UiEvent.ShowError("Could not update habit: ${e.message}"))
          }
-
-
       }
    }
 
@@ -201,8 +182,11 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
             isDoneToday = habitWithLogs.logs.any { today == it.date },
             sortOrder = habit.sortOrder,
             frequencyType = habit.frequencyType,
-            customDays = habit.customDays?.split(",")?.filter { it.isNotBlank() }
-               ?.map { DayOfWeek.valueOf(it) }?.toSet() ?: emptySet(),
+            customDays = habit.customDays
+               ?.split(",")
+               ?.filter { it.isNotBlank() }
+               ?.map { DayOfWeek.valueOf(it) }
+               ?.toSet() ?: emptySet(),
             timesPerWeek = habit.timesPerWeek,
             reminderTime = habit.reminderTime?.let { LocalTime.parse(it) },
             color = habit.color,

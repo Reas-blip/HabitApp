@@ -108,6 +108,8 @@ fun HabitMainScreen(
    val habitUiState by habitViewModel.habitUiState.collectAsStateWithLifecycle()
    val hasSeenSwipeHint by habitViewModel.hasSeenSwipeHint.collectAsStateWithLifecycle()
 
+   val displayedHabitUiState by habitViewModel.displayedHabitUiState.collectAsStateWithLifecycle()
+
    val filteredHabitUiState by habitViewModel.filteredHabitUiState.collectAsStateWithLifecycle()
    val habits by remember {
       derivedStateOf {
@@ -158,7 +160,6 @@ fun HabitMainScreen(
          habits.mapNotNull { it.color }.distinct()
       }
    }
-   // Leave Scaffold's topBar blank so we can dynamically control the top area ourselves
    Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       floatingActionButton = { if (showFab) FloatingActionButton(onCreateHabit) }
@@ -175,11 +176,9 @@ fun HabitMainScreen(
                .statusBarsPadding()
          ) {
             AnimatedTopAppBar(isSearchExpanded, animationDuration) {
-               // NORMAL STATE: Render the real top app bar
                TopAppBar(
                   title = { Text(screenTitle, style = MaterialTheme.typography.titleLarge) },
                   navigationIcon = {
-                     // The three-line hamburger menu button
                      IconButton(onClick = onMenuClick) {
                         Icon(
                            imageVector = Icons.Default.Menu,
@@ -201,21 +200,20 @@ fun HabitMainScreen(
                filteredHabits,
                onQueryChange = { habitViewModel.onSearchQueryChange(it) },
                onHabitClicked = { searchHabitId ->
-                  habitViewModel.requestScrollTo(searchHabitId) // ← new: same mechanism as notifications
+                  habitViewModel.requestScrollTo(searchHabitId)
                   onHabitClicked(searchHabitId)
                   isSearchExpanded = false
-//                                 habitViewModel.onSearchQueryChange("")
-//                                 focusManager.clearFocus()
                },
             )
-         }      // --- MAIN BODY CONTENT AREA BELOW THE SEARCH SECTOR ---
+         }
+         // MAIN BODY CONTENT AREA BELOW THE SEARCH SECTOR
          Box(
             modifier = Modifier
                .fillMaxWidth()
                .weight(1f)
          ) {
             MainBodyContent(
-               habitUiState,
+               displayedHabitUiState,
                scrollToHabitId,
                habitViewModel,
                hasSeenSwipeHint,
@@ -247,14 +245,7 @@ internal fun MainBodyContent(
    availableColors: List<Int> = emptyList(),
    onClickScrimBackground: () -> Unit,
 ) {
-   val displayedHabitUiState by habitViewModel.displayedHabitUiState.collectAsStateWithLifecycle()
    val colorFilter by habitViewModel.colorFilter.collectAsStateWithLifecycle()
-
-   val displayedHabits by remember {
-      derivedStateOf {
-         (displayedHabitUiState as? UiState.Success)?.habits ?: emptyList()
-      }
-   }
 
    // Distinct colors pulled from the FULL unfiltered list, so chips don't disappear
    // once you've filtered down to one color
@@ -269,7 +260,7 @@ internal fun MainBodyContent(
       }
       when (habitUiState) {
          is UiState.Success -> HabitList(
-            habitList = displayedHabits,
+            habitList = habitUiState.habits,
             scrollToHabitId = scrollToHabitId,
             onScrollHandled = habitViewModel::onScrollHandled,
             hasSeenSwipeHint = hasSeenSwipeHint,

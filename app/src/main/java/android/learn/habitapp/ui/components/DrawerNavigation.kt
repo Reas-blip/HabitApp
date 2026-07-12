@@ -3,6 +3,7 @@ package android.learn.habitapp.ui.components
 import android.learn.habitapp.HabitDetailViewModel
 import android.learn.habitapp.HabitViewModel
 import android.learn.habitapp.navigation.ArchivedHabitScreen
+import android.learn.habitapp.navigation.DestinationObject
 import android.learn.habitapp.navigation.HabitDetail
 import android.learn.habitapp.navigation.HabitListScreen
 import android.learn.habitapp.navigation.animatedComposable
@@ -31,8 +32,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.toRoute
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -48,9 +51,13 @@ fun DrawerNavigation(
    val coroutineScope = rememberCoroutineScope()
    var selectedItem by remember { mutableIntStateOf(0) }
 
-   val items = listOf("Dashboard", "Archived")
+   val items = listOf(
+      DestinationObject.HabitListObject,
+      DestinationObject.ArchivedHabitObject
+   )
    val icons = listOf(Icons.Default.Home, Icons.Default.Archive)
 
+   val navBackStackEntry by navController.currentBackStackEntryAsState()
    // 2. Wrap everything in the ModalNavigationDrawer container
    ModalNavigationDrawer(
       drawerState = drawerState,
@@ -65,10 +72,12 @@ fun DrawerNavigation(
             )
 
             items.forEachIndexed { index, item ->
+               val isCurrent = navController.currentDestination
+                  ?.hasRoute(item.routeClass) == true
                IOSInsetListRow(
                   icon = icons[index],
-                  title = item,
-                  selected = selectedItem == index,
+                  title = item.name,
+                  selected = isCurrent,
                   onClick = {
                      selectedItem = index
                      coroutineScope.launch { drawerState.close() }
