@@ -309,7 +309,7 @@ fun HabitRow(
    modifier: Modifier = Modifier,
    onToggle: () -> Unit = {},
    onClickHabit: () -> Unit = {},
-   reorderableScope: ReorderableCollectionItemScope,
+   reorderableScope: ReorderableCollectionItemScope? = null,
    onDragStopped: () -> Unit,
 ) {
 
@@ -350,11 +350,14 @@ fun HabitRow(
                indication = null, // avoid double ripple; row bg already provides feedback
                onClick = { onClickHabit() },
                onLongClick = { /* no-op: draggableHandle listens to the same source */ })
-            .then(
-               with(reorderableScope) {
-                  Modifier.longPressDraggableHandle(
-                     onDragStopped = onDragStopped
-                  )
+            .then(if (reorderableScope != null) {
+                  with(reorderableScope) {
+                     Modifier.longPressDraggableHandle(
+                        onDragStopped = onDragStopped
+                     )
+                  }
+               } else {
+                  Modifier
                })
 
             .background(backgroundColor, RoundedCornerShape(20.dp))

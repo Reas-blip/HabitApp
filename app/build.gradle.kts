@@ -54,11 +54,17 @@ android {
 
    packaging {
       resources {
-         excludes += "META-INF/LICENSE.md"
-         excludes += "META-INF/LICENSE.txt"
-         excludes += "META-INF/NOTICE.md"
-         excludes += "META-INF/NOTICE.txt"
+// Exclude duplicate license and notice files
+            excludes.add("/META-INF/LICENSE-notice.md")
+
+            // Optional: You can also exclude other common duplicates to prevent future errors
+            excludes.add("/META-INF/LICENSE.md")
+            excludes.add("/META-INF/NOTICE.md")
+            excludes.add("/META-INF/LICENSE")
+            excludes.add("/META-INF/NOTICE")
       }
+
+
    }
    buildFeatures {
       compose = true
@@ -91,6 +97,7 @@ dependencies {
    implementation(libs.androidx.core.ktx)
    implementation(libs.androidx.lifecycle.runtime.ktx)
    implementation(libs.kotlinx.coroutines.android)
+   testImplementation(libs.turbine)
    implementation(libs.kotlinx.coroutines.core)
    implementation(libs.androidx.activity.compose)
    implementation(platform(libs.androidx.compose.bom))
@@ -109,10 +116,13 @@ dependencies {
    testImplementation(platform(libs.androidx.compose.bom))
    testImplementation(libs.androidx.ui.test.junit4)
    testImplementation(libs.mockk)
+   androidTestImplementation(libs.turbine)
    androidTestImplementation(libs.mockk)
    androidTestImplementation(libs.androidx.junit)
    androidTestImplementation(libs.androidx.runner)
 
+   androidTestImplementation(libs.kotlinx.coroutines.test)
+   testImplementation(libs.kotlinx.coroutines.test)
    androidTestImplementation(libs.androidx.espresso.core)
    androidTestImplementation(platform(libs.androidx.compose.bom))
    androidTestImplementation(libs.hilt.android.testing)
