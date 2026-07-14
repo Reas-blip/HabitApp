@@ -74,12 +74,6 @@ cd HabitApp
 
 Open in Android Studio, let Gradle sync, then run on a device or emulator running Android 13 (API 33) or higher.
 
-## Testing
-
-```bash
-./gradlew test
-```
-
 ## Known gaps / next steps
 
 - No cloud sync — data is local-only (Room), so it doesn't survive an app uninstall or move devices
