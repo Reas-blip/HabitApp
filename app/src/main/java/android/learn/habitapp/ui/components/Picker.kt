@@ -374,9 +374,7 @@ fun ReminderPicker(
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
          )
-         Text(reminderTime?.let {
-            it.format(DateTimeFormatter.ofPattern("h:mm a"))
-         } ?: "Off", style = MaterialTheme.typography.bodyLarge)
+         Text(reminderTime?.format(DateTimeFormatter.ofPattern("h:mm a")) ?: "Off", style = MaterialTheme.typography.bodyLarge)
       }
       if (reminderTime != null) {
          IconButton(onClick = { onReminderChange(null) }) {

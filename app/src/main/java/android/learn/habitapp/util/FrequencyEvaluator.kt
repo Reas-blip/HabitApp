@@ -1,5 +1,4 @@
-// FrequencyEvaluator.kt
-package android.learn.habitapp.notifications
+package android.learn.habitapp.util
 
 import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.local.HabitEntity
@@ -22,9 +21,9 @@ object FrequencyEvaluator {
 
     /** Should today's reminder actually be shown, given the habit's frequency rules? */
     suspend fun shouldNotifyToday(
-        habit: HabitEntity,
-        repository: HabitRepository,
-        today: LocalDate = LocalDate.now(ZoneId.systemDefault())
+       habit: HabitEntity,
+       repository: HabitRepository,
+       today: LocalDate = LocalDate.now(ZoneId.systemDefault())
     ): Boolean {
         return when (habit.frequencyType) {
             FrequencyType.DAILY -> true

@@ -9,6 +9,7 @@ import android.content.Intent
 import android.learn.habitapp.MainActivity
 import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.repository.HabitRepository
+import android.learn.habitapp.util.FrequencyEvaluator
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat

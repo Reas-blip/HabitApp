@@ -1,0 +1,30 @@
+
+SOLUTION TO BUSINESS REVIEW & PRODUCT EVALUTION ASSESSMENT
+
+SCENARIO 1:
+ 5 Star Review
+Overall, I was very satisfied with my experience using this product. I had high expectations for this product given its premium price point and description. But this product did not disappoint. The quality of the mug was excellent. It had a slick design and a premium feel. Setting up the mobile app was a breeze.
+ I was genuinely blown away by the thought that went into its design. The reliability has been very good throughout daily use.
+The temperature control heated the contents of the mug to the right temperature consistently. After several weeks of use, the battery life remained strong.
+The price is absolutely worth it. I would recommend this to anyone looking for a dependable, premium mug.
+
+4 Star Review
+I had a good experience using this product. I was looking for a reliable product in this category, and this mug met my expectations. The design of the mug was intuitive, and the mobile app made the temperature control very convenient and easy to use. The mug delivered on all its features. The only downside was the price. Other products offered similar or more features at a lower cost.
+Overall, I am happy with the product and the user experience. I would recommend it to anyone willing to pay a premium price.
+
+
+2 Star Review
+This product was really disappointing to use. I had high expectations for this product seeing the price.
+I expected it to be the product I have been searching for, but the product was quite frustrating to use.
+While it had some promising features, it only worked half the time. For instance, when I tried connecting the app to the mug it failed several times despite following the instructions. When the app finally connected, I would use the temperature control to increase the temperature, but the mug did not respond to the change. This product has potential to be very good if these issues are resolved.
+Based on my experience I won't recommend this product.
+
+SCENARIO 2:
+5 Star Review
+SwiftDesk is a virtual assistant service that, as a business owner, I found to be very good. Before finding a virtual assistant service, I did not expect anything special, but using this service surpassed my expectations. In my company, our emails, meetings, and calendars were not synced. This led to a lot of inefficiencies wasting both time and money.  After subscribing to this service, I immediately saw an increase in efficiency of our operations, particularly in how quickly our team could process requests.
+Managing the meetings, emails, and calendars lightened the administrative load on our staff,
+allowing them to focus more on core operations. I would recommend this service, as you will earn back the money spent on it.
+
+3 Star Review
+My experience with this service is balanced. As a business owner, I understand how important it is to organize our meetings, emails and calendars. This service improved our core operations allowing us to reach more customers. However, it needs improvement. As an IT call center, we need a virtual assistant service, but the response times during busy hours are quite slow, which affects our operations as the busy hours are usually the most crucial.
+Overall, the service offered is good, but I believe the response times can be improved.

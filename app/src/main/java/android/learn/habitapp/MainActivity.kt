@@ -34,10 +34,14 @@ class MainActivity : ComponentActivity() {
                }
             }
             val detailViewModel: HabitDetailViewModel = hiltViewModel()
-
-            DrawerNavigation(
+//
+//            DrawerNavigation(
+//               habitViewModel = habitViewModel,
+//               navController = navController,
+//               detailViewModel = detailViewModel
+//            )
+            HabitAppNewUi(
                habitViewModel = habitViewModel,
-               navController = navController,
                detailViewModel = detailViewModel
             )
          }
@@ -53,3 +57,11 @@ class MainActivity : ComponentActivity() {
       }
    }
 }
+
+
+
+
+
+
+
+

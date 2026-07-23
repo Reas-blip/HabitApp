@@ -1,4 +1,6 @@
-package android.learn.habitapp
+package android.learn.habitapp.util
+
+import android.learn.habitapp.getStartOfTodayTimestamp
 
 fun calculateCurrentStreak(logDates: List<Long>): Int {
    if (logDates.isEmpty()) return 0

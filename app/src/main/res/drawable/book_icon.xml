@@ -1,0 +1,35 @@
+<!--
+  ~ Copyright (C) 2026 The Android Open Source Project
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~      http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="18dp"
+    android:height="18dp"
+    android:viewportWidth="18"
+    android:viewportHeight="18">
+  <path
+      android:pathData="M9,5.25V15.75"
+      android:strokeLineJoin="round"
+      android:strokeWidth="1.5"
+      android:fillColor="#00000000"
+      android:strokeColor="#4CAF50"
+      android:strokeLineCap="round"/>
+  <path
+      android:pathData="M2.25,13.5C2.051,13.5 1.86,13.421 1.72,13.28C1.579,13.14 1.5,12.949 1.5,12.75V3C1.5,2.801 1.579,2.61 1.72,2.47C1.86,2.329 2.051,2.25 2.25,2.25H6C6.796,2.25 7.559,2.566 8.121,3.129C8.684,3.691 9,4.454 9,5.25C9,4.454 9.316,3.691 9.879,3.129C10.441,2.566 11.204,2.25 12,2.25H15.75C15.949,2.25 16.14,2.329 16.28,2.47C16.421,2.61 16.5,2.801 16.5,3V12.75C16.5,12.949 16.421,13.14 16.28,13.28C16.14,13.421 15.949,13.5 15.75,13.5H11.25C10.653,13.5 10.081,13.737 9.659,14.159C9.237,14.581 9,15.153 9,15.75C9,15.153 8.763,14.581 8.341,14.159C7.919,13.737 7.347,13.5 6.75,13.5H2.25Z"
+      android:strokeLineJoin="round"
+      android:strokeWidth="1.5"
+      android:fillColor="#00000000"
+      android:strokeColor="#4CAF50"
+      android:strokeLineCap="round"/>
+</vector>

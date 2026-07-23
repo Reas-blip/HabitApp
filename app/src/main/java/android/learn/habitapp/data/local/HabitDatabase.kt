@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
       HabitEntity::class,
       HabitLogsEntity::class
    ],
-   version = 2
+   version = 3
 )
 abstract class HabitDatabase : RoomDatabase() {
    companion object {
@@ -39,7 +39,6 @@ abstract class HabitDatabase : RoomDatabase() {
                HabitDatabase::class.java,
                "habit_database"
             )
-               .addMigrations(MIGRATION_1_2)
                .build()
          }
          return habitDatabase

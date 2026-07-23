@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="NONE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="2be4ece5-764b-4126-a3f8-4feb040a8889" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/HabitScreenNewUi.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/StatScren.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/TodayHabitScreen.kt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/res/drawable/check_icon.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/res/drawable/search_icon.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/main/res/drawable/settings_icon.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../.idea/deploymentTargetSelector.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../.idea/deploymentTargetSelector.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/ui/components/Picker.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/ui/components/Picker.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/ui/theme/Theme.kt" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/android/learn/habitapp/ui/theme/Theme.kt" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "Reas-blip"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/Reas-blip/HabitApp.git",
+    "accountId": "e4e4b859-8bd9-42bb-9ecb-ab1ba387d3d1"
+  }
+}]]></component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "associatedIndex": 0,
+  "fromUser": false
+}]]></component>
+  <component name="ProjectId" id="3GbOu2pbB2OmQCXuKlhu7dNvTwA" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "android.gradle.sync.needed": "true",
+    "cidr.known.project.marker": "true",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "C:/Users/HP/AndroidStudioProjects/HabitApp/app"
+  }
+}]]></component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="2be4ece5-764b-4126-a3f8-4feb040a8889" name="Changes" comment="" />
+      <created>1784237044942</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1784237044942</updated>
+    </task>
+    <servers />
+  </component>
+</project>

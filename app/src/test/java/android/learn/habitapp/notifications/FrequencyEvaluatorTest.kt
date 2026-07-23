@@ -3,6 +3,7 @@ package android.learn.habitapp.notifications
 import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.repository.HabitRepository
+import android.learn.habitapp.util.FrequencyEvaluator
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking

@@ -2,6 +2,7 @@ package android.learn.habitapp.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 enum class FrequencyType {
    DAILY,
@@ -13,6 +14,7 @@ enum class FrequencyType {
 data class HabitEntity(
    @PrimaryKey(autoGenerate = true)
    val id: Int = 0,
+   val groupId: String = UUID.randomUUID().toString(),
    val name: String,
    val emoji: String,
 
@@ -24,6 +26,8 @@ data class HabitEntity(
    val color: Int? = null,
    val sortOrder: Int = 0,
    val isArchived: Boolean = false,
+   val isReplaced: Boolean = false,
 
+   val replacedAt: Long? = null,
    val createdAt: Long = System.currentTimeMillis()
 )

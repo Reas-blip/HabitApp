@@ -162,8 +162,7 @@ fun HabitMainScreen(
    }
    Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
-      floatingActionButton = { if (showFab) FloatingActionButton(onCreateHabit) }
-   ) { innerPadding ->
+      floatingActionButton = { if (showFab) FloatingActionButton(onCreateHabit) }) { innerPadding ->
 
       Column(
          modifier = Modifier
@@ -255,8 +254,7 @@ internal fun MainBodyContent(
          ColorFilterRow(
             availableColors = availableColors,
             selectedColor = colorFilter,
-            onColorSelected = { habitViewModel.onColorFilterChanged(it) }
-         )
+            onColorSelected = { habitViewModel.onColorFilterChanged(it) })
       }
       when (habitUiState) {
          is UiState.Success -> HabitList(
@@ -269,7 +267,8 @@ internal fun MainBodyContent(
                habitViewModel.onHabitChecked(habitId)
             },
             onArchiveHabit = onArchiveHabit,
-            onHabitsReordered = { habitList -> habitViewModel.onHabitsReordered(habitList) }) { habitId ->
+            onHabitsReordered = { habitList -> habitViewModel.onHabitsReordered(habitList) }
+         ) { habitId ->
             onHabitClicked(
                habitId
             )
@@ -386,21 +385,20 @@ private fun SearchScreen(
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
                items(filteredHabits, key = { it.id }) { habit ->
                   val searchHabitId = habit.id
-                  Row(
-                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                           onHabitClicked(searchHabitId)
-                        }
-                        .sharedBounds(
-                           sharedContentState = rememberSharedContentState(
-                              key = HabitSharedElementKey(
-                                 searchHabitId, type = HabitSharedElementType.Bounds
-                              )
-                           ),
-                           animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
-                        )
-                        .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                  Row(modifier = Modifier
+                     .fillMaxWidth()
+                     .clickable {
+                        onHabitClicked(searchHabitId)
+                     }
+                     .sharedBounds(
+                        sharedContentState = rememberSharedContentState(
+                           key = HabitSharedElementKey(
+                              searchHabitId, type = HabitSharedElementType.Bounds
+                           )
+                        ),
+                        animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+                     )
+                     .padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                      Icon(
                         imageVector = Icons.Default.Bolt,
                         contentDescription = null,
@@ -427,11 +425,17 @@ internal fun ColumnScope.AnimatedTopAppBar(
 ) {
    val density = LocalDensity.current
    AnimatedVisibility(
-      visible = !isSearchExpanded,
-      enter = fadeIn(animationSpec = tween(animationDuration, easing = LinearOutSlowInEasing)) + scaleIn(
+      visible = !isSearchExpanded, enter = fadeIn(
+         animationSpec = tween(
+            animationDuration, easing = LinearOutSlowInEasing
+         )
+      ) + scaleIn(
          initialScale = 0.92f, animationSpec = tween(animationDuration)
-      ) + expandVertically(animationSpec = tween(animationDuration, easing = LinearOutSlowInEasing)),
-      exit =
+      ) + expandVertically(
+         animationSpec = tween(
+            animationDuration, easing = LinearOutSlowInEasing
+         )
+      ), exit =
          // 1. Visually disappear FIRST (runs from 0ms to 150ms)
          fadeOut(
             animationSpec = tween(
@@ -446,12 +450,10 @@ internal fun ColumnScope.AnimatedTopAppBar(
                        delayMillis = 50, // Matches the duration of the fadeOut!
                        easing = FastOutLinearInEasing
                     )
-                 ),
-      modifier = Modifier.onGloballyPositioned { coordinates ->
+                 ), modifier = Modifier.onGloballyPositioned { coordinates ->
          val topAppBarHeightInt = with(density) { coordinates.size.height }
          measureTopAppBarHeight(topAppBarHeightInt)
-      },
-      content = content
+      }, content = content
    )
 }
 

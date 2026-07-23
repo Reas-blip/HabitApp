@@ -13,7 +13,7 @@ interface HabitDao {
    @Query("SELECT COUNT(*) FROM habit_logs WHERE habitId = :habitId AND date >= :weekStart AND date <= :weekEnd")
    suspend fun getLogCountInRange(habitId: Int, weekStart: Long, weekEnd: Long): Int
    @Insert(onConflict = OnConflictStrategy.REPLACE)
-   suspend fun insertHabit(habit: HabitEntity)
+   suspend fun insertHabit(habit: HabitEntity): Long
 
 
    @Update
@@ -32,11 +32,15 @@ interface HabitDao {
    suspend fun loadHabit(habitId: Int): HabitEntity
 
    @Transaction
-   @Query("SELECT * from habits WHERE isArchived = 0 ORDER BY sortOrder ASC")
+   @Query("SELECT * from habits WHERE isArchived = 0 AND isReplaced = 0 ORDER BY sortOrder ASC")
    fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>
 
    @Transaction
-   @Query("SELECT * from habits WHERE isArchived = 1 ORDER BY sortOrder ASC")
+   @Query("SELECT * from habits WHERE isArchived = 0 ORDER BY sortOrder ASC")
+   fun getAllHabitsWithLogs(): Flow<List<HabitWithLogs>>
+
+   @Transaction
+   @Query("SELECT * from habits WHERE isArchived = 1 AND isReplaced = 0 ORDER BY sortOrder ASC")
    fun getArchivedHabitsWithLogs(): Flow<List<HabitWithLogs>>
    @Transaction
    @Query("SELECT * from habits WHERE id = :habitId")

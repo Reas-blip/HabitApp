@@ -55,13 +55,13 @@ android {
    packaging {
       resources {
 // Exclude duplicate license and notice files
-            excludes.add("/META-INF/LICENSE-notice.md")
+         excludes.add("/META-INF/LICENSE-notice.md")
 
-            // Optional: You can also exclude other common duplicates to prevent future errors
-            excludes.add("/META-INF/LICENSE.md")
-            excludes.add("/META-INF/NOTICE.md")
-            excludes.add("/META-INF/LICENSE")
-            excludes.add("/META-INF/NOTICE")
+         // Optional: You can also exclude other common duplicates to prevent future errors
+         excludes.add("/META-INF/LICENSE.md")
+         excludes.add("/META-INF/NOTICE.md")
+         excludes.add("/META-INF/LICENSE")
+         excludes.add("/META-INF/NOTICE")
       }
 
 

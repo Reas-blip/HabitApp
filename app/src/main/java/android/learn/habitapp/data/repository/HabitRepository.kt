@@ -13,7 +13,7 @@ interface HabitRepository {
    suspend fun unarchiveHabit(habitId: Int)
 
 
-   suspend fun insertHabit(habit: HabitEntity)
+   suspend fun insertHabit(habit: HabitEntity): Long
    suspend fun updateHabit(habit: HabitEntity)
    suspend fun updateSortOrders(idsInOrder: List<Int>)
    suspend fun insertHabitLog(habitLog: HabitLogsEntity)
@@ -35,13 +35,14 @@ interface HabitRepository {
    suspend fun updateSortOrder(habitId: Int, newOrder: Int)
    val hasSeenSwipeHint: Flow<Boolean>
    suspend fun setSwipeHintSeen()
+   fun getAllHabitsWithLogs(): Flow<List<HabitWithLogs>>
 }
 
 class HabitRepositoryImpl @Inject constructor(
    private val habitDao: HabitDao,
    private val habitPreferences: HabitPreferences,
 ) : HabitRepository {
-   override suspend fun insertHabit(habit: HabitEntity) {
+   override suspend fun insertHabit(habit: HabitEntity): Long {
      return habitDao.insertHabit(habit)
    }
 
@@ -50,6 +51,11 @@ class HabitRepositoryImpl @Inject constructor(
    override suspend fun setSwipeHintSeen() {
       habitPreferences.setSwipeHintSeen()
    }
+
+   override fun getAllHabitsWithLogs(): Flow<List<HabitWithLogs>> {
+     return habitDao.getAllHabitsWithLogs()
+   }
+
    override suspend fun getLogCountInRange(habitId: Int, weekStart: Long, weekEnd: Long): Int {
       return habitDao.getLogCountInRange(habitId, weekStart, weekEnd)
    }
