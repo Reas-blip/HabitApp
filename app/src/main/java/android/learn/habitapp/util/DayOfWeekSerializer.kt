@@ -1,4 +1,4 @@
-package android.learn.habitapp.ui
+package android.learn.habitapp.util
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
