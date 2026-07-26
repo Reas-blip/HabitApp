@@ -31,6 +31,13 @@ interface HabitDao {
    @Query("SELECT * from habits WHERE id = :habitId")
    suspend fun loadHabit(habitId: Int): HabitEntity
 
+   @Query("SELECT COUNT(*) FROM habit_logs WHERE habitId = :habitId AND date = :date")
+   suspend fun getLogCountForDate(habitId: Int, date: Long): Int
+   // HabitDao
+   @Transaction
+   @Query("SELECT * from habits ORDER BY sortOrder ASC")
+   fun getAllHabitsRaw(): Flow<List<HabitWithLogs>>
+
    @Transaction
    @Query("SELECT * from habits WHERE isArchived = 0 AND isReplaced = 0 ORDER BY sortOrder ASC")
    fun getHabitsWithLogs(): Flow<List<HabitWithLogs>>

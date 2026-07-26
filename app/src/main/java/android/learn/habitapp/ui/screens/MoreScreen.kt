@@ -1,7 +1,7 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.screens
 
-import android.R.attr.fontFamily
-import android.R.attr.fontWeight
+import android.learn.habitapp.R
+import android.learn.habitapp.ui.theme.HabitColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,6 +35,7 @@ fun MoreScreen() {
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
       modifier = Modifier
+         .background(Color.Transparent)
          .padding(vertical = 8.dp.scaledHeight(), horizontal = 16.dp.scaledWidth())
    ) {
       MoreTopAppBar()
@@ -58,9 +58,9 @@ fun MoreTopAppBar() {
 
 @Composable
 fun AccountNameCard() {
-   Column(
-      verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Top),
-      horizontalAlignment = Alignment.Start,
+   Row(
+      horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.Start),
+      verticalAlignment = Alignment.CenterVertically,
       modifier = Modifier
          .shadow(
             elevation = 2.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000)
@@ -68,7 +68,7 @@ fun AccountNameCard() {
          .shadow(elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .fillMaxWidth()
          .height(80.dp.scaledHeight())
-         .background(color = Color(0xFFFFFFFF), shape = RoundedCornerShape(size = 16.dp))
+         .background(color = HabitColors.Surface, shape = RoundedCornerShape(size = 16.dp))
          .padding(16.dp.scaledWidth())
    ) {
 
@@ -80,20 +80,21 @@ fun AccountNameCard() {
       Column(
          verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Top),
          horizontalAlignment = Alignment.Start,
+         modifier = Modifier.wrapContentSize()
       ) {
 
          Text(
             text = "Excellence Okeniyi!", style = MaterialTheme.typography.titleSmall.copy(
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
                fontWeight = FontWeight(700),
-               color = Color(0xFF101828),
+               color = HabitColors.TextPrimary,
             )
          )
          Text(
             text = "Stay consistent, achieve more",
             style = MaterialTheme.typography.titleSmall.copy(
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
-               color = Color(0xFF99A1AF),
+               color = HabitColors.TextSecondary,
             )
          )
       }
@@ -122,7 +123,7 @@ fun MoreMenuCard() {
          .shadow(elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .fillMaxWidth()
          .wrapContentHeight()
-         .background(color = Color(0xFFFFFFFF), shape = RoundedCornerShape(size = 16.dp))
+         .background(color = HabitColors.Surface, shape = RoundedCornerShape(size = 16.dp))
    ) {
       // Child views.
       Text(
@@ -130,7 +131,7 @@ fun MoreMenuCard() {
          style = MaterialTheme.typography.bodySmall.copy(
 //            fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
             fontWeight = FontWeight(600),
-            color = Color(0xFF99A1AF),
+            color = HabitColors.TextSecondary,
             letterSpacing = 0.6.sp,
          ),
          modifier = Modifier
@@ -182,7 +183,7 @@ fun MoreMenuItem(
             style = MaterialTheme.typography.bodyMedium.copy(
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
                fontWeight = FontWeight(600),
-               color = Color(0xFF1E2939),
+               color = HabitColors.TextPrimary,
             )
          )
          Text(
@@ -190,11 +191,10 @@ fun MoreMenuItem(
             style = MaterialTheme.typography.bodySmall.copy(
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
                fontWeight = FontWeight(500),
-               color = Color(0xFF99A1AF),
+               color = HabitColors.TextSecondary,
             )
          )
       }
-
 
    }
 

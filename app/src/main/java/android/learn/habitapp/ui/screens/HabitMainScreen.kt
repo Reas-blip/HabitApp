@@ -104,19 +104,19 @@ fun HabitMainScreen(
    onMenuClick: () -> Unit
 ) {
 
-   val searchQuery by habitViewModel.searchQuery.collectAsState()
    val habitUiState by habitViewModel.habitUiState.collectAsStateWithLifecycle()
    val hasSeenSwipeHint by habitViewModel.hasSeenSwipeHint.collectAsStateWithLifecycle()
 
    val displayedHabitUiState by habitViewModel.displayedHabitUiState.collectAsStateWithLifecycle()
 
-   val filteredHabitUiState by habitViewModel.filteredHabitUiState.collectAsStateWithLifecycle()
    val habits by remember {
       derivedStateOf {
          (habitUiState as? UiState.Success)?.habits ?: emptyList()
       }
    }
 
+   val searchQuery by habitViewModel.searchQuery.collectAsState()
+   val filteredHabitUiState by habitViewModel.filteredHabitUiState.collectAsStateWithLifecycle()
    val filteredHabits by remember {
       derivedStateOf {
          if (searchQuery.isEmpty()) emptyList()
@@ -126,19 +126,19 @@ fun HabitMainScreen(
          }
       }
    }
-
-   val scrollToHabitId by habitViewModel.scrollToHabitId.collectAsStateWithLifecycle()
    var isSearchExpanded by remember { mutableStateOf(false) }
    val focusManager = LocalFocusManager.current
    val animationDuration = 200
-
-   val showFab = (habitUiState is UiState.Success) && !isSearchExpanded
-
    BackHandler(enabled = isSearchExpanded) {
       isSearchExpanded = false
       habitViewModel.onSearchQueryChange("")
       focusManager.clearFocus(force = true)
    }
+
+
+   val scrollToHabitId by habitViewModel.scrollToHabitId.collectAsStateWithLifecycle()
+   val showFab = (habitUiState is UiState.Success) && !isSearchExpanded
+
 
    val snackbarHostState = remember { SnackbarHostState() }
    val scope = rememberCoroutineScope()

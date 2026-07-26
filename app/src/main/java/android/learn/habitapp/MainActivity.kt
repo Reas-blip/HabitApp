@@ -11,7 +11,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import android.learn.habitapp.ui.theme.HabitAppTheme
-import android.learn.habitapp.ui.components.DrawerNavigation
+import android.learn.habitapp.ui.components.HabitAppNewUi
 
 
 @AndroidEntryPoint

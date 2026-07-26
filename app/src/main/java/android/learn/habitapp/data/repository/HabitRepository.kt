@@ -18,6 +18,7 @@ interface HabitRepository {
    suspend fun updateSortOrders(idsInOrder: List<Int>)
    suspend fun insertHabitLog(habitLog: HabitLogsEntity)
    suspend fun deleteHabitLog(habitId: Int, today: Long)
+
    // HabitRepository
    suspend fun getLogCountInRange(habitId: Int, weekStart: Long, weekEnd: Long): Int
 
@@ -35,6 +36,10 @@ interface HabitRepository {
    suspend fun updateSortOrder(habitId: Int, newOrder: Int)
    val hasSeenSwipeHint: Flow<Boolean>
    suspend fun setSwipeHintSeen()
+   suspend fun getLogCountForDate(habitId: Int, date: Long): Int
+   // Impl
+
+   fun getAllHabitsRaw(): Flow<List<HabitWithLogs>>
    fun getAllHabitsWithLogs(): Flow<List<HabitWithLogs>>
 }
 
@@ -43,22 +48,29 @@ class HabitRepositoryImpl @Inject constructor(
    private val habitPreferences: HabitPreferences,
 ) : HabitRepository {
    override suspend fun insertHabit(habit: HabitEntity): Long {
-     return habitDao.insertHabit(habit)
+      return habitDao.insertHabit(habit)
    }
 
+   override fun getAllHabitsRaw(): Flow<List<HabitWithLogs>> = habitDao.getAllHabitsRaw()
+
    override val hasSeenSwipeHint: Flow<Boolean> = habitPreferences.hasSeenSwipeHint
+
+
+   override suspend fun getLogCountForDate(habitId: Int, date: Long): Int =
+      habitDao.getLogCountForDate(habitId, date)
 
    override suspend fun setSwipeHintSeen() {
       habitPreferences.setSwipeHintSeen()
    }
 
    override fun getAllHabitsWithLogs(): Flow<List<HabitWithLogs>> {
-     return habitDao.getAllHabitsWithLogs()
+      return habitDao.getAllHabitsWithLogs()
    }
 
    override suspend fun getLogCountInRange(habitId: Int, weekStart: Long, weekEnd: Long): Int {
       return habitDao.getLogCountInRange(habitId, weekStart, weekEnd)
    }
+
    override suspend fun updateSortOrders(idsInOrder: List<Int>) {
       habitDao.updateSortOrders(idsInOrder)
    }

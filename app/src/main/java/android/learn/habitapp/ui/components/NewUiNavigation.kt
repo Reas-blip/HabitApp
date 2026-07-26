@@ -1,13 +1,22 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.components
 
+import android.learn.habitapp.HabitDetailViewModel
+import android.learn.habitapp.HabitViewModel
+import android.learn.habitapp.R
 import android.learn.habitapp.navigation.HabitDetail
 import android.learn.habitapp.navigation.animatedComposable
 import android.learn.habitapp.ui.screens.HabitItemRoute
-import androidx.activity.viewModels
+import android.learn.habitapp.ui.screens.HabitScreen
+import android.learn.habitapp.ui.screens.MoreScreen
+import android.learn.habitapp.ui.screens.SearchScreenRoute
+import android.learn.habitapp.ui.screens.StatsScreen
+import android.learn.habitapp.ui.screens.TodayHabitScreen
+import android.learn.habitapp.ui.theme.HabitColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -37,15 +45,21 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlin.getValue
 
 @Serializable
 sealed interface Destination {
 
+   @Serializable
+   data class HabitDetail(
+      val habitId: Int? = null, val currentToken: Long = 0L
+   ) : Destination
+
+
+   @Serializable
+   data object Search : Destination
 
    @Serializable
    data object Today : Destination
@@ -98,27 +112,31 @@ fun BottomNavBar(
                }
             },
             icon = {
+               Icon(
+                  painterResource(item.iconId),
+                  contentDescription = item.label,
+                  tint = if (isSelected) HabitColors.Primary else HabitColors.TextSecondary
+               )
+            },
+            label = {
                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                  Icon(
-                     painterResource(item.iconId),
-                     contentDescription = item.label,
-                  )
+                  Text(item.label, fontSize = 10.sp, color = if (isSelected) HabitColors.Primary else HabitColors.TextSecondary)
+
                   if (isSelected) {
                      Spacer(Modifier.height(2.dp))
                      Box(
                         Modifier
                            .size(4.dp)
                            .clip(CircleShape)
-                           .background(GreenMid)
+                           .background(HabitColors.Primary)
                      )
                   }
                }
             },
-            label = { Text(item.label, fontSize = 10.sp) },
             colors = NavigationBarItemDefaults.colors(
                selectedTextColor = MaterialTheme.colorScheme.onPrimary,
-               unselectedIconColor = TextMuted,
-               unselectedTextColor = TextMuted,
+               unselectedIconColor = HabitColors.SurfaceTintDark,
+               unselectedTextColor = HabitColors.SurfaceTintDark,
                indicatorColor = Color.Transparent,
             ),
          )
@@ -137,7 +155,10 @@ fun HabitAppNewUi(
    val coroutineScope = rememberCoroutineScope()
    Scaffold(
       bottomBar = {
-         BottomNavBar(
+         val showBottomBar = currentDestination?.let {
+               !( it.hasRoute(Destination.HabitDetail::class) || it.hasRoute(Destination.Search::class))
+         } ?: false
+         if (showBottomBar) BottomNavBar(
             navController,
             currentDestination
          )
@@ -147,7 +168,8 @@ fun HabitAppNewUi(
          navController = navController,
          startDestination = Destination.Today,
          modifier = Modifier
-            .background(Color.Transparent)
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
             .padding(innerPadding)
       ) {
 
@@ -160,7 +182,7 @@ fun HabitAppNewUi(
                },
                onHabitClicked = { habitId ->
                   detailViewModel.loadHabit(habitId)
-                  navController.navigate(HabitDetail(habitId))
+                  navController.navigate(Destination.HabitDetail(habitId))
                },
             )
          }
@@ -170,12 +192,15 @@ fun HabitAppNewUi(
                habitViewModel = habitViewModel,
                onAddHabit = {
                   detailViewModel.newHabit()
-                  navController.navigate(HabitDetail())
+                  navController.navigate(Destination.HabitDetail())
                },
                onHabitClicked = { habitId ->
                   detailViewModel.loadHabit(habitId)
-                  navController.navigate(HabitDetail(habitId))
+                  navController.navigate(Destination.HabitDetail(habitId))
                },
+               onSearchClick = {
+                  navController.navigate(Destination.Search)
+               }
             )
          }
 
@@ -189,9 +214,9 @@ fun HabitAppNewUi(
             MoreScreen()
          }
 
-         animatedComposable<HabitDetail> { backStackEntry ->
+         animatedComposable<Destination.HabitDetail> { backStackEntry ->
 
-            val detailArgs = backStackEntry.toRoute<HabitDetail>()
+            val detailArgs = backStackEntry.toRoute<Destination.HabitDetail>()
 
             HabitItemRoute(
                habitId = detailArgs.habitId ?: -1,
@@ -202,6 +227,14 @@ fun HabitAppNewUi(
                   navController.popBackStack()
 
                }
+            }
+         }
+         animatedComposable<Destination.Search> {
+            SearchScreenRoute(habitViewModel, onBackPressed = {
+               navController.popBackStack()
+            }) { habitId ->
+               detailViewModel.loadHabit(habitId)
+               navController.navigate(Destination.HabitDetail(habitId))
             }
          }
 

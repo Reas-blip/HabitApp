@@ -1,4 +1,4 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.components
 
 import android.graphics.BlurMaskFilter
 import android.graphics.Paint

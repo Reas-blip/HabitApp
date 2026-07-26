@@ -2,473 +2,385 @@ package android.learn.habitapp.util
 
 import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.local.HabitEntity
-import android.learn.habitapp.data.local.HabitLogsEntity
-import android.learn.habitapp.data.local.HabitWithLogs
 import android.learn.habitapp.data.local.HabitStatItem
+import android.learn.habitapp.data.local.HabitWithLogs
 import android.learn.habitapp.data.local.OverviewStats
 import android.learn.habitapp.data.local.Timeframe
-import android.learn.habitapp.getStartOfTodayTimestamp
 import android.learn.habitapp.util.FrequencyEvaluator.parseCustomDays
-import android.learn.habitapp.util.HabitStatsCalculator.getDateRange
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import kotlin.collections.first
 
-enum class DayStatus { Completed, Missed, NotApplicable }
+/** Simple result of any "how many were due vs done" question. */
+data class RangeStats(val due: Int, val done: Int) {
+   val percent: Int get() = if (due == 0) 0 else (done * 100 / due)
+}
+
+private fun Long.toLocalDate(): LocalDate =
+   Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
+
 object HabitStatsCalculator {
 
-   fun isScheduledForToday(habit: HabitEntity, logs: List<HabitLogsEntity>, today: LocalDate = LocalDate.now(ZoneId.systemDefault())): Boolean {
-      val logDates = logs.map { Instant.ofEpochMilli(it.date).atZone(ZoneId.systemDefault()).toLocalDate() }.toSet()
+   // ── FUNCTION 1: was this ONE habit-version due on this ONE date? ──────────
+   // Every "which version applies on this date" question lives here, and ONLY here.
+   fun isDueOn(habit: HabitEntity, date: LocalDate): Boolean {
+      val createdDate = habit.createdAt.toLocalDate()
+      if (date.isBefore(createdDate)) return false
+
+      val replacedDate = habit.replacedAt?.toLocalDate()
+      // "not before" (>=), not "after" (>) — the day it was replaced belongs
+      // to the NEW version, not this one. This is the boundary that caused
+      // the double-count bug in the old version.
+      if (replacedDate != null && !date.isBefore(replacedDate)) return false
+
       return when (habit.frequencyType) {
          FrequencyType.DAILY -> true
-         FrequencyType.SPECIFIC_DAYS -> today.dayOfWeek in parseCustomDays(habit)
-         FrequencyType.TIMES_PER_WEEK -> {
-            val (weekStart, _) = getDateRange(Timeframe.WEEK, today)
-            logDates.count { !it.isBefore(weekStart) && it.isBefore(today) } < (habit.timesPerWeek ?: 1)
-         }
+         FrequencyType.SPECIFIC_DAYS -> date.dayOfWeek in parseCustomDays(habit)
+         FrequencyType.TIMES_PER_WEEK -> true // not used — TIMES_PER_WEEK has no single "due day"
       }
    }
 
-   fun weeklyCompletionByDay(
-      habitsWithLogs: List<HabitWithLogs>,
-      weekStart: LocalDate = LocalDate.now(ZoneId.systemDefault()).with(DayOfWeek.MONDAY)
-   ): Map<DayOfWeek, Boolean> {
-      val weekEnd = weekStart.plusDays(6)
 
-      return DayOfWeek.entries.associateWith { day ->
-         val date = weekStart.with(day)
-         // "complete" for this day = every applicable habit was done (or no habits were due)
-         habitsWithLogs
-            .filter { it.habit.frequencyType != FrequencyType.TIMES_PER_WEEK } // excluded, per above
-            .all { habitWithLogs ->
-               val logDates = habitWithLogs.logs.map { it.date }.toSet()
-               val status = HabitStatsCalculator.evaluateRange(
-                  habitWithLogs.habit, logDates, date, date
-               ).first()
-               status != DayStatus.Missed // NotApplicable or Completed both count as "not a failure"
-            }
-      }
+   fun isScheduledToday(habit: HabitEntity): Boolean {
+      return isDueOn(habit, LocalDate.now(ZoneId.systemDefault()))
    }
 
-   /**
-    * For a single habit, checks a date range and classifies each date as:
-    * - not applicable (habit didn't exist yet, or wasn't due that day per frequency)
-    * - completed (a log exists)
-    * - missed (was due, habit existed, but no log)
-    */
-   fun evaluateRange(
+   // ── FUNCTION 2: count due/done for ONE habit-version over a date range ────
+   fun countDayBased(
       habit: HabitEntity,
-      logDates: Set<Long>, // the habit's log dates, as epoch-day-start millis
-      startDate: LocalDate,
-      endDate: LocalDate
-   ): List<DayStatus> {
-      val createdDate = Instant.ofEpochMilli(habit.createdAt)
-         .atZone(ZoneId.systemDefault()).toLocalDate()
-
-      val results = mutableListOf<DayStatus>()
-      var current = startDate
-
-      while (!current.isAfter(endDate)) {
-         val dateMillis = current.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-
-         val status = when {
-            current.isBefore(createdDate) -> DayStatus.NotApplicable
-            !isDueOn(habit, current) -> DayStatus.NotApplicable
-            dateMillis in logDates -> DayStatus.Completed
-            else -> DayStatus.Missed
-         }
-         results.add(status)
-         current = current.plusDays(1)
-      }
-      return results
-   }
-
-   private fun isDueOn(habit: HabitEntity, date: LocalDate): Boolean {
-      return when (habit.frequencyType) {
-         FrequencyType.DAILY -> true
-         FrequencyType.SPECIFIC_DAYS -> {
-            val allowedDays = FrequencyEvaluator.parseCustomDays(habit)
-            date.dayOfWeek in allowedDays
-         }
-
-         FrequencyType.TIMES_PER_WEEK -> true
-         // TIMES_PER_WEEK has no fixed days — every day is "eligible," but whether
-         // it counts as a genuine miss is fuzzier (see note below)
-      }
-   }
-
-   /** Missed count — only counts days from the timeframe's start up through TODAY,
-    *  never future days within the same period, so it doesn't falsely count
-    *  "hasn't happened yet" as "missed." */
-   private fun getMissedCount(
-      allHabitsWithLogs: List<HabitWithLogs>,
-      timeframe: Timeframe,
-      referenceDate: LocalDate = LocalDate.now(ZoneId.systemDefault())
-   ): Int {
-      val (start, end) = getDateRange(timeframe, referenceDate)
-      val clippedEnd = minOf(
-         end,
-         referenceDate.minusDays(1)
-      ) // never look past today, even if the timeframe extends further
-
-      if (clippedEnd.isBefore(start)) return 0 // timeframe hasn't started yet relative to referenceDate
-
-      val stats = calculateStatsForRange(allHabitsWithLogs, start, clippedEnd)
-      return stats.grandTotalDue - stats.grandTotalCompleted
-   }
-
-// HabitStatsHelpers.kt
-
-   /** How many habit-completions are still outstanding from TODAY through
-    *  the end of the given timeframe (e.g. "12 things left to do this month"). */
-   private fun getRemainingDueForTimeframe(
-      allHabitsWithLogs: List<HabitWithLogs>,
-      timeframe: Timeframe,
-      referenceDate: LocalDate = LocalDate.now(ZoneId.systemDefault())
-   ): Int {
-      val (start, end) = HabitStatsCalculator.getDateRange(timeframe, referenceDate)
-      val clippedStart = maxOf(start, referenceDate) // never look before today
-
-      if (clippedStart.isAfter(end)) return 0 // timeframe already fully in the past relative to referenceDate
-
-      val stats = HabitStatsCalculator.calculateStatsForRange(allHabitsWithLogs, clippedStart, end)
-      return stats.grandTotalDue - stats.grandTotalCompleted
-   }
-
-   fun calculateStats(
-      allHabitsWithLogs: List<HabitWithLogs>,
-      timeframe: Timeframe,
-      referenceDate: LocalDate = LocalDate.now(ZoneId.systemDefault())
-   ): OverviewStats {
-      val latestVersionsOfHabitsWithLogs = allHabitsWithLogs.filter { it.habit.isReplaced == false }
-
-      val missedHabits = getMissedCount(
-         allHabitsWithLogs = latestVersionsOfHabitsWithLogs,
-         timeframe = timeframe,
-      )
-
-      val remainingDueForTimeframe = getRemainingDueForTimeframe(
-         allHabitsWithLogs = latestVersionsOfHabitsWithLogs,
-         timeframe = timeframe,
-      )
-
-      val (start, end) = getDateRange(timeframe, referenceDate)
-      val clippedEnd = minOf(end, referenceDate)
-      return calculateStatsForRange(allHabitsWithLogs, start, clippedEnd)
-         .copy(
-            missedCount = missedHabits,
-            remainingDue = remainingDueForTimeframe
-         )
-   }
-
-   /** Same logic as before, but takes an explicit range instead of deriving one from a Timeframe. */
-   fun calculateStatsForRange(
-      allHabitsWithLogs: List<HabitWithLogs>,
-      timeframeStart: LocalDate,
-      timeframeEnd: LocalDate
-   ): OverviewStats {
-      val groupedByFamily = allHabitsWithLogs.groupBy { it.habit.groupId }
-
-
-      var grandTotalDue = 0
-      var grandTotalCompleted = 0
-
-      val habitStatItems = groupedByFamily.map { (groupId, versions) ->
-         val latestVersion = versions.maxByOrNull { it.habit.createdAt }!!.habit
-
-
-         val timesPerWeekVersions =
-            versions.filter { it.habit.frequencyType == FrequencyType.TIMES_PER_WEEK }
-         val otherVersions =
-            versions.filter { it.habit.frequencyType != FrequencyType.TIMES_PER_WEEK }
-
-         var familyDue = 0
-         var familyCompleted = 0
-
-         otherVersions.forEach { item ->
-            val habit = item.habit
-            val habitStart = Instant.ofEpochMilli(habit.createdAt)
-               .atZone(ZoneId.systemDefault()).toLocalDate()
-            val habitEnd = habit.replacedAt?.let {
-               Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
-            } ?: timeframeEnd
-
-            val effectiveStart = maxOf(timeframeStart, habitStart)
-            val effectiveEnd = minOf(timeframeEnd, habitEnd)
-
-            if (!effectiveStart.isAfter(effectiveEnd)) {
-               val (due, completed) = calculateDayBasedCounts(item, effectiveStart, effectiveEnd)
-               familyDue += due
-               familyCompleted += completed
-            }
-         }
-
-         if (timesPerWeekVersions.isNotEmpty()) {
-            val (due, completed) = calculateTimesPerWeekFamilyCounts(
-               versions = timesPerWeekVersions,
-               startDate = timeframeStart,
-               endDate = timeframeEnd
-            )
-            familyDue += due
-            familyCompleted += completed
-         }
-
-         grandTotalDue += familyDue
-         grandTotalCompleted += familyCompleted
-
-         val percent =
-            if (familyDue == 0) 0 else ((familyCompleted.toFloat() / familyDue) * 100).toInt()
-
-         HabitStatItem(
-            habitId = latestVersion.id,
-            groupId = groupId,
-            habitName = latestVersion.name,
-            habitEmoji = latestVersion.emoji,
-            color = latestVersion.color,
-            completionPercent = percent.coerceIn(0, 100),
-            totalDue = familyDue,
-            totalCompleted = familyCompleted
-         )
-      }
-
-      val overallSuccessRate =
-         if (grandTotalDue == 0) 0 else ((grandTotalCompleted.toFloat() / grandTotalDue) * 100).toInt()
-
-      return OverviewStats(
-         successRatePercent = overallSuccessRate.coerceIn(0, 100),
-         grandTotalDue = grandTotalDue,
-         grandTotalCompleted = grandTotalCompleted,
-         habitStats = habitStatItems
-      )
-   }
-
-   // Make this internal (not private) so the wrapper functions below can call it directly
-   internal fun getDateRange(timeframe: Timeframe, refDate: LocalDate): Pair<LocalDate, LocalDate> {
-      return when (timeframe) {
-         Timeframe.DAY -> refDate to refDate
-         Timeframe.WEEK -> {
-            val start = refDate.with(DayOfWeek.MONDAY)
-            start to start.plusDays(6)
-         }
-
-         Timeframe.MONTH -> {
-            val start = refDate.withDayOfMonth(1)
-            start to start.plusMonths(1).minusDays(1)
-         }
-
-         Timeframe.YEAR -> {
-            val start = refDate.withDayOfYear(1)
-            start to start.plusYears(1).minusDays(1)
-         }
-      }
-   }
-
-   /** DAILY / SPECIFIC_DAYS — safe to compute per-version, since a single day never spans a version boundary. */
-   private fun calculateDayBasedCounts(
-      item: HabitWithLogs,
-      startDate: LocalDate,
-      endDate: LocalDate
-   ): Pair<Int, Int> {
-      val habit = item.habit
-      val logDates = item.logs.map {
-         Instant.ofEpochMilli(it.date).atZone(ZoneId.systemDefault()).toLocalDate()
-      }.toSet()
-
+      logDates: Set<LocalDate>,
+      start: LocalDate,
+      end: LocalDate
+   ): RangeStats {
       var due = 0
-      var completed = 0
-
-      when (habit.frequencyType) {
-         FrequencyType.DAILY -> {
-            var curr = startDate
-            while (!curr.isAfter(endDate)) {
-               due++
-               if (curr in logDates) completed++
-               curr = curr.plusDays(1)
-            }
+      var done = 0
+      var day = start
+      while (!day.isAfter(end)) {
+         if (isDueOn(habit, day)) {
+            due++
+            if (day in logDates) done++
          }
-
-         FrequencyType.SPECIFIC_DAYS -> {
-            val allowedDays = parseCustomDays(habit)
-            var curr = startDate
-            while (!curr.isAfter(endDate)) {
-               if (curr.dayOfWeek in allowedDays) {
-                  due++
-                  if (curr in logDates) completed++
-               }
-               curr = curr.plusDays(1)
-            }
-         }
-
-         FrequencyType.TIMES_PER_WEEK -> {
-            // Unreachable — filtered out before this function is called.
-         }
+         day = day.plusDays(1)
       }
-
-      return due to completed
+      return RangeStats(due, done)
    }
 
-   /**
-    * TIMES_PER_WEEK — handled at the family level, across all versions at once.
-    * For each calendar week in range, picks whichever version was active for the
-    * most days of that week and uses ITS target — so a mid-week frequency change
-    * counts that week exactly once, not once per version.
-    */
-   private fun calculateTimesPerWeekFamilyCounts(
+   // Sums countDayBased across every DAILY/SPECIFIC_DAYS version in a habit family.
+   // No manual clipping needed — isDueOn already returns false outside each
+   // version's own window, so inactive versions just contribute zero.
+   fun countDayBasedFamily(
       versions: List<HabitWithLogs>,
-      startDate: LocalDate,
-      endDate: LocalDate
-   ): Pair<Int, Int> {
+      start: LocalDate,
+      end: LocalDate
+   ): RangeStats {
       var due = 0
-      var completed = 0
-      var weekStart = startDate.with(DayOfWeek.MONDAY)
+      var done = 0
+      versions
+         .filter { it.habit.frequencyType != FrequencyType.TIMES_PER_WEEK }
+         .forEach { v ->
+            val logDates = v.logs.map { it.date.toLocalDate() }.toSet()
+            val r = countDayBased(v.habit, logDates, start, end)
+            due += r.due
+            done += r.done
+         }
+      return RangeStats(due, done)
+   }
 
-      val allLogDatesInFamily = versions.flatMap { it.logs }.map {
-         Instant.ofEpochMilli(it.date).atZone(ZoneId.systemDefault()).toLocalDate()
-      }
+   // How many days of [weekStart, weekEnd] does this habit-version actually cover,
+   // clamped to the [start, end] range we were asked about? Used only to decide
+   // which version "owns" a week when a frequency change happens mid-week.
+   private fun overlapDays(habit: HabitEntity, weekStart: LocalDate, weekEnd: LocalDate): Long {
+      val habitStart = habit.createdAt.toLocalDate()
+      val habitEnd = habit.replacedAt?.toLocalDate()?.minusDays(1) ?: weekEnd
 
-      while (!weekStart.isAfter(endDate)) {
+      val overlapStart = maxOf(weekStart, habitStart)
+      val overlapEnd = minOf(weekEnd, habitEnd)
+      return if (overlapStart.isAfter(overlapEnd)) 0L
+      else overlapEnd.toEpochDay() - overlapStart.toEpochDay() + 1
+   }
+
+   // TIMES_PER_WEEK — a fundamentally different shape (weekly target, not daily due-ness).
+   // See the walkthrough below for exactly what this does and why.
+   fun countWeeklyFamily(
+      versions: List<HabitWithLogs>,
+      start: LocalDate,
+      end: LocalDate
+   ): RangeStats {
+      val weeklyVersions = versions.filter { it.habit.frequencyType == FrequencyType.TIMES_PER_WEEK }
+      if (weeklyVersions.isEmpty()) return RangeStats(0, 0)
+
+      val allLogDates = weeklyVersions.flatMap { it.logs }.map { it.date.toLocalDate() }.toSet()
+
+      var due = 0
+      var done = 0
+      var weekStart = start.with(DayOfWeek.MONDAY)
+
+      while (!weekStart.isAfter(end)) {
          val weekEnd = weekStart.plusDays(6)
+         val clippedWeekEnd = minOf(weekEnd, end) // don't look past what we were asked for
 
-         val activeVersion = versions
-            .mapNotNull { item ->
-               val habit = item.habit
-               val habitStart = Instant.ofEpochMilli(habit.createdAt)
-                  .atZone(ZoneId.systemDefault()).toLocalDate()
-               val habitEnd = habit.replacedAt?.let {
-                  Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
-               } ?: weekEnd
+         val activeHabit = weeklyVersions
+            .map { it.habit }
+            .maxByOrNull { overlapDays(it, weekStart, clippedWeekEnd) }
 
-               val overlapStart = maxOf(weekStart, habitStart)
-               val overlapEnd = minOf(weekEnd, habitEnd)
-               val overlapDays = if (overlapStart.isAfter(overlapEnd)) {
-                  -1L
-               } else {
-                  overlapEnd.toEpochDay() - overlapStart.toEpochDay() + 1
-               }
-               if (overlapDays > 0) habit to overlapDays else null
+         if (activeHabit != null && overlapDays(activeHabit, weekStart, clippedWeekEnd) > 0) {
+            val fullTarget = activeHabit.timesPerWeek ?: 1
+
+            // If this week isn't over yet (clippedWeekEnd < the week's natural Sunday),
+            // scale the target down to how much of the week has actually elapsed —
+            // otherwise a 3x/week habit shows "due: 3" on Monday morning, before
+            // there's been any real chance to complete it.
+            val elapsedDays = (clippedWeekEnd.toEpochDay() - weekStart.toEpochDay() + 1)
+               .coerceAtLeast(0)
+            val target = if (clippedWeekEnd.isBefore(weekEnd)) {
+               kotlin.math.ceil(fullTarget * elapsedDays / 7.0).toInt().coerceAtMost(fullTarget)
+            } else {
+               fullTarget
             }
-            .maxByOrNull { it.second }
-            ?.first
 
-         if (activeVersion != null) {
-            val target = activeVersion.timesPerWeek ?: 1
-            val completionsThisWeek = allLogDatesInFamily.count { date ->
-               !date.isBefore(weekStart) && !date.isAfter(weekEnd) &&
-                       !date.isBefore(startDate) && !date.isAfter(endDate)
+            val completedInWeek = allLogDates.count { logDate ->
+               !logDate.isBefore(weekStart) && !logDate.isAfter(clippedWeekEnd) &&
+                       !logDate.isBefore(start)
             }
             due += target
-            completed += minOf(completionsThisWeek, target)
+            done += minOf(completedInWeek, target)
          }
 
          weekStart = weekStart.plusWeeks(1)
       }
 
-      return due to completed
+      return RangeStats(due, done)
    }
 
-   fun shouldNotifyToday(
-      item: HabitWithLogs,
+   // ── The one function everything else calls ────────────────────────────────
+   fun statsForFamily(
+      versions: List<HabitWithLogs>,
+      start: LocalDate,
+      end: LocalDate
+   ): RangeStats {
+      val dayBased = countDayBasedFamily(versions, start, end)
+      val weekly = countWeeklyFamily(versions, start, end)
+      return RangeStats(dayBased.due + weekly.due, dayBased.done + weekly.done)
+   }
+
+   // ── Whole-list convenience: stats per habit family + grand totals ─────────
+   fun calculateOverview(
+      allHabitsWithLogs: List<HabitWithLogs>,
+      start: LocalDate,
+      end: LocalDate
+   ): Map<String, RangeStats> {
+      return allHabitsWithLogs
+         .groupBy { it.habit.groupId }
+         .mapValues { (_, versions) -> statsForFamily(versions, start, end) }
+   }
+
+   // Shared by weeklyCompletionByDay and the streak functions below — the single
+   // source of truth for "on this date, were the due habits completed?"
+   // true = everything due that day was done, false = something was missed,
+   // null = nothing was actually due (TIMES_PER_WEEK families never count here,
+   // same exclusion as countDayBasedFamily — they're judged per-week, not per-day).
+   private fun familyStatusOnDate(
+      families: Map<String, List<HabitWithLogs>>,
+      date: LocalDate
+   ): Boolean? {
+      var anyApplicable = false
+      var allCompleted = true
+
+      families.values.forEach { versions ->
+         val activeVersion = versions.firstOrNull { v ->
+            v.habit.frequencyType != FrequencyType.TIMES_PER_WEEK && isDueOn(v.habit, date)
+         } ?: return@forEach
+
+         anyApplicable = true
+         val logDates = activeVersion.logs.map { it.date.toLocalDate() }.toSet()
+         if (date !in logDates) allCompleted = false
+      }
+
+      return if (!anyApplicable) null else allCompleted
+   }
+
+   // For each day of a week: true = every applicable habit was completed,
+   // false = at least one was missed, null = nothing was actually due that day.
+   // TIMES_PER_WEEK is skipped here — it has no single "due day," it's judged
+   // per-week by countWeeklyFamily instead.
+   fun weeklyCompletionByDay(
+      allHabitsWithLogs: List<HabitWithLogs>,
+      weekStart: LocalDate = LocalDate.now(ZoneId.systemDefault()).with(DayOfWeek.MONDAY)
+   ): Map<DayOfWeek, Boolean?> {
+      val families = allHabitsWithLogs.groupBy { it.habit.groupId }
+      return DayOfWeek.entries.associateWith { dayOfWeek ->
+         familyStatusOnDate(families, weekStart.with(dayOfWeek))
+      }
+   }
+
+   // Consecutive days, walking backward from today, where everything due was
+   // done. A day with nothing due (null) is skipped — it neither extends nor
+   // breaks the streak. Today itself gets a pass if it's not finished yet
+   // (status == false), so the streak isn't punished mid-day; a genuine miss
+   // on any earlier day stops the count.
+   fun calculateOverallCurrentStreak(
+      allHabitsWithLogs: List<HabitWithLogs>,
       today: LocalDate = LocalDate.now(ZoneId.systemDefault())
-   ): Boolean {
-      val habit = item.habit
-      val logDates = item.logs.map {
-         Instant.ofEpochMilli(it.date).atZone(ZoneId.systemDefault()).toLocalDate()
-      }.toSet()
+   ): Int {
+      if (allHabitsWithLogs.isEmpty()) return 0
+      val families = allHabitsWithLogs.groupBy { it.habit.groupId }
+      val lowerBound = allHabitsWithLogs.minOf { it.habit.createdAt.toLocalDate() }
 
-      return when (habit.frequencyType) {
-         FrequencyType.DAILY -> true
-         FrequencyType.SPECIFIC_DAYS -> today.dayOfWeek in parseCustomDays(habit)
-         FrequencyType.TIMES_PER_WEEK -> {
-            val (weekStart, _) = getDateRange(Timeframe.WEEK, today)
-            val completedThisWeek = logDates.count { date ->
-               !date.isBefore(weekStart) && date.isBefore(today)
-            }
-            completedThisWeek < (habit.timesPerWeek ?: 1)
+      var current = today
+      var streak = 0
+      var isFirstDay = true
+
+      while (!current.isBefore(lowerBound)) {
+         val status = familyStatusOnDate(families, current)
+
+         if (isFirstDay && status == false) {
+            // today isn't over yet — give it a pass rather than treating
+            // "not done YET" the same as "missed"
+            isFirstDay = false
+            current = current.minusDays(1)
+            continue
+         }
+         isFirstDay = false
+
+         when (status) {
+            true -> { streak++; current = current.minusDays(1) }
+            null -> current = current.minusDays(1) // nothing due — skip, don't break
+            false -> return streak
          }
       }
+      return streak
    }
 
-}
-/**
- * "Any habit done" streak — counts consecutive days where AT LEAST ONE
- * habit (any habit) was completed, regardless of which one. Not per-habit.
- */
-fun calculateOverallCurrentStreak(
-   allHabitsWithLogs: List<HabitWithLogs>,
-   timeframe: Timeframe = Timeframe.YEAR
-): Int {
-   val allLogMillis = allHabitsWithLogs
-      .flatMap { it.logs }
-      .map { it.date }
+   // Longest run of consecutive days (across all history) where everything
+   // due was completed. Same null-skipping rule as the current streak.
+   fun calculateOverallLongestStreak(
+      allHabitsWithLogs: List<HabitWithLogs>,
+      today: LocalDate = LocalDate.now(ZoneId.systemDefault())
+   ): Int {
+      if (allHabitsWithLogs.isEmpty()) return 0
+      val families = allHabitsWithLogs.groupBy { it.habit.groupId }
+      val lowerBound = allHabitsWithLogs.minOf { it.habit.createdAt.toLocalDate() }
 
-   if (allLogMillis.isEmpty()) return 0
+      var longestStreak = 0
+      var currentStreak = 0
+      var date = lowerBound
 
-   val (timeframeStart, _) = getDateRange(timeframe, LocalDate.now(ZoneId.systemDefault()))
-
-   val filteredLogMillis = allLogMillis.filter {
-      val date = Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate()
-      !date.isBefore(timeframeStart) // inclusive, per the fix from last message
-   }
-
-   if (filteredLogMillis.isEmpty()) return 0
-
-   val oneDayMillis = 24 * 60 * 60 * 1000L
-   val sortedDesc = filteredLogMillis.toSortedSet(compareByDescending { it })
-   val today = getStartOfTodayTimestamp()
-
-   var expected = today
-   if (expected !in sortedDesc) expected -= oneDayMillis // today not done yet, count from yesterday
-
-   var streak = 0
-   for (date in sortedDesc) {
-      when {
-         date == expected -> {
-            streak++
-            expected -= oneDayMillis
+      while (!date.isAfter(today)) {
+         when (familyStatusOnDate(families, date)) {
+            true -> { currentStreak++; longestStreak = maxOf(longestStreak, currentStreak) }
+            false -> currentStreak = 0
+            null -> Unit // nothing due — doesn't grow or break the run
          }
-         date < expected -> return streak // gap found
+         date = date.plusDays(1)
       }
-   }
-   return streak
-}
-/**
- * "Any habit done" longest streak — longest run of consecutive days where
- * AT LEAST ONE habit (any habit) was completed, across the whole history
- * (or clipped to a timeframe, if provided).
- */
-fun calculateOverallLongestStreak(
-   allHabitsWithLogs: List<HabitWithLogs>,
-   timeframe: Timeframe = Timeframe.YEAR
-): Int {
-   val allLogMillis = allHabitsWithLogs
-      .flatMap { it.logs }
-      .map { it.date }
-
-   if (allLogMillis.isEmpty()) return 0
-
-   val (timeframeStart, _) = getDateRange(timeframe, LocalDate.now(ZoneId.systemDefault()))
-
-   val sortedDates = allLogMillis
-      .map { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
-      .filter { !it.isBefore(timeframeStart) }
-      .distinct()
-      .sorted()
-
-   if (sortedDates.isEmpty()) return 0
-
-   var longest = 1
-   var current = 1
-
-   for (i in 1 until sortedDates.size) {
-      current = if (sortedDates[i] == sortedDates[i - 1].plusDays(1)) {
-         current + 1
-      } else {
-         1
-      }
-      longest = maxOf(longest, current)
+      return longestStreak
    }
 
-   return longest
+   // ── Timeframe → date range, used only by calculateStats below ─────────────
+   private fun getDateRange(timeframe: Timeframe, refDate: LocalDate): Pair<LocalDate, LocalDate> =
+      when (timeframe) {
+         Timeframe.DAY -> refDate to refDate
+         Timeframe.WEEK -> {
+            val s = refDate.with(DayOfWeek.MONDAY)
+            s to s.plusDays(6)
+         }
+         Timeframe.MONTH -> {
+            val s = refDate.withDayOfMonth(1)
+            s to s.plusMonths(1).minusDays(1)
+         }
+         Timeframe.YEAR -> {
+            val s = refDate.withDayOfYear(1)
+            s to s.plusYears(1).minusDays(1)
+         }
+      }
+
+   // Due-but-not-done, counted only over days that have FULLY elapsed
+   // (up through yesterday) — so a habit due later today doesn't get
+   // flagged as "missed" before the day is even over.
+   private fun missedCount(
+      allHabitsWithLogs: List<HabitWithLogs>,
+      timeframe: Timeframe,
+      referenceDate: LocalDate
+   ): Int {
+      val (start, end) = getDateRange(timeframe, referenceDate)
+      val clippedEnd = minOf(end, referenceDate.minusDays(1))
+      if (clippedEnd.isBefore(start)) return 0
+
+      var due = 0
+      var done = 0
+      allHabitsWithLogs.groupBy { it.habit.groupId }.values.forEach { versions ->
+         val r = statsForFamily(versions, start, clippedEnd)
+         due += r.due
+         done += r.done
+      }
+      return due - done
+   }
+
+   // Due-but-not-done, counted from today through the rest of the timeframe —
+   // e.g. "12 things left to do this month."
+   private fun remainingDue(
+      allHabitsWithLogs: List<HabitWithLogs>,
+      timeframe: Timeframe,
+      referenceDate: LocalDate
+   ): Int {
+      val (start, end) = getDateRange(timeframe, referenceDate)
+      val clippedStart = maxOf(start, referenceDate)
+      if (clippedStart.isAfter(end)) return 0
+
+      var due = 0
+      var done = 0
+      allHabitsWithLogs.groupBy { it.habit.groupId }.values.forEach { versions ->
+         val r = statsForFamily(versions, clippedStart, end)
+         due += r.due
+         done += r.done
+      }
+      return due - done
+   }
+
+   // ── The UI-facing entry point — builds OverviewStats from RangeStats ──────
+   // Everything here is composition: no new due/done logic, just calling
+   // statsForFamily per habit family and packaging the results.
+   fun calculateStats(
+      allHabitsWithLogs: List<HabitWithLogs>,
+      timeframe: Timeframe,
+      referenceDate: LocalDate = LocalDate.now(ZoneId.systemDefault())
+   ): OverviewStats {
+      val (start, end) = getDateRange(timeframe, referenceDate)
+      val clippedEnd = minOf(end, referenceDate) // never count future days as due yet
+
+      var grandDue = 0
+      var grandDone = 0
+
+      val habitStatItems = allHabitsWithLogs
+         .groupBy { it.habit.groupId }
+         .map { (groupId, versions) ->
+            // display info (name/emoji/color) comes from whichever version is newest —
+            // due/done math still runs across ALL versions via statsForFamily
+            val latest = versions.maxByOrNull { it.habit.createdAt }!!.habit
+            val stats = statsForFamily(versions, start, clippedEnd)
+            grandDue += stats.due
+            grandDone += stats.done
+
+            HabitStatItem(
+               habitId = latest.id,
+               groupId = groupId,
+               habitName = latest.name,
+               habitEmoji = latest.emoji,
+               color = latest.color,
+               completionPercent = stats.percent,
+               totalDue = stats.due,
+               totalCompleted = stats.done
+            )
+         }
+
+      return OverviewStats(
+         successRatePercent = RangeStats(grandDue, grandDone).percent,
+         grandTotalDue = grandDue,
+         grandTotalCompleted = grandDone,
+         habitStats = habitStatItems,
+         missedCount = missedCount(allHabitsWithLogs, timeframe, referenceDate),
+         remainingDue = remainingDue(allHabitsWithLogs, timeframe, referenceDate)
+      )
+   }
 }

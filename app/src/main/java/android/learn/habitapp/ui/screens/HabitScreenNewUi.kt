@@ -1,5 +1,7 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.screens
 
+import android.learn.habitapp.HabitViewModel
+import android.learn.habitapp.R
 import android.learn.habitapp.data.local.OverviewStats
 import android.learn.habitapp.navigation.HabitSharedElementKey
 import android.learn.habitapp.navigation.HabitSharedElementType
@@ -8,9 +10,13 @@ import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
 import android.learn.habitapp.ui.components.ErrorScreen
 import android.learn.habitapp.ui.components.LoadingSpinner
+import android.learn.habitapp.ui.theme.HabitColors
 import android.learn.habitapp.ui.theme.LocalSharedTransitionScope
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +27,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,7 +36,6 @@ import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,7 +51,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxDefaults
@@ -96,20 +99,23 @@ import kotlin.math.abs
 fun HabitOverview(
 
    todayStats: OverviewStats,
-   weeklyCompletionByDay: Map<DayOfWeek, Boolean>,
+   weeklyCompletionByDay: Map<DayOfWeek, Boolean?>,
    modifier: Modifier = Modifier,
 ) {
    Column(
       modifier = modifier
          .fillMaxWidth()
+         .shadow(
+            elevation = 4.dp, // Adjust this value to make the shadow larger/smaller
+            shape = RoundedCornerShape(16.dp),
+            clip = true // This handles the clipping, so you can remove your .clip() modifier
+         )
          .background(color = Color.White)
-         .shadow(elevation = 1.dp, shape = RoundedCornerShape(16.dp))
-         .clip(shape = RoundedCornerShape(16.dp))
          .padding(all = 16.dp.scaledWidth())
    ) {
       Text(
          "Daily Progress",
-         style = MaterialTheme.typography.labelMedium.copy(color = Color(0xFF99A1AF)),
+         style = MaterialTheme.typography.labelMedium.copy(color = HabitColors.TextSecondary),
          modifier = Modifier.align(alignment = Alignment.Start)
       )
       Row(
@@ -134,7 +140,7 @@ fun HabitOverview(
                text = "Great job! 😊",
                style = MaterialTheme.typography.bodySmall.copy(
                   fontWeight = FontWeight(500),
-                  color = MaterialTheme.colorScheme.onPrimary,
+
                )
             )
          }
@@ -149,9 +155,9 @@ fun HabitOverview(
                fontSize = 9.sp,
                lineHeight = 13.5.sp,
                fontWeight = FontWeight(400),
-               color = Color(0xFF99A1AF),
+               color = HabitColors.TextSecondary,
             ),
-            progress = 0.4f,
+            progress = if (todayStats.grandTotalDue == 0) 0f else todayStats.grandTotalCompleted / todayStats.grandTotalDue.toFloat(),
             size = 80.dp
          )
 
@@ -164,14 +170,14 @@ fun HabitOverview(
       ) {
 
          val selectedDays = weeklyCompletionByDay.filter { entries ->
-            entries.value
+            entries.value == true
          }.keys
          DayOfWeek.entries.forEach { day ->
             val selected = day in selectedDays
             Surface(
                shape = RoundedCornerShape(50f),
-               color = if (true) MaterialTheme.colorScheme.primary
-               else MaterialTheme.colorScheme.surfaceContainerHigh,
+               color = if (selected) HabitColors.PrimaryLight
+               else Color(0x68989898),
                modifier = Modifier
                   .width(42.dp.scaledWidth())
                   .height(18.dp.scaledHeight())
@@ -179,8 +185,8 @@ fun HabitOverview(
                Box(contentAlignment = Alignment.Center) {
                   Text(
                      day.name.take(1), // M T W T F S S
-                     color = if (selected) MaterialTheme.colorScheme.onPrimary
-                     else MaterialTheme.colorScheme.onSurface,
+                     color = if (selected) HabitColors.PrimaryDark
+                     else  HabitColors.Surface,
                      style = MaterialTheme.typography.labelMedium
                   )
                }
@@ -200,15 +206,25 @@ fun OverViewProgressBar(
    modifier: Modifier = Modifier,
    size: Dp = 80.dp,
 ) {
+   val animatedProgress by animateFloatAsState(
+      targetValue = progress,
+      // You can use the standard progress animation spec or a custom tween(500)
+      animationSpec = spring(
+      ),
+      label = "OverviewProgressAnimation"
+   )
    Box(
       contentAlignment = Alignment.Center,
       modifier = modifier
          .size(size.scaledWidth()) // Total size of the widget
          .padding(4.dp.scaledWidth())
    ) {
+
       CircularProgressIndicator(
-         progress = { progress },
+         progress = { animatedProgress },
          modifier = Modifier.fillMaxSize(),
+         color = HabitColors.Accent,
+         trackColor = Color(0xFFE8F5E9),
          strokeWidth = 10.dp,
          gapSize = (-10).dp
       )
@@ -236,6 +252,8 @@ fun OverViewProgressBar(
 fun HabitIconBadge(
    icon: Painter,
    backgroundColor: Color,
+   modifier: Modifier = Modifier,
+   iconModifier: Modifier = Modifier,
    iconTint: Color = Color.White,
    size: Dp = 40.dp,
    elevation: Dp = 2.dp,
@@ -246,17 +264,21 @@ fun HabitIconBadge(
    Box(
       modifier = Modifier
          .size(size)
-         .clip(shape)
-         .shadow(elevation = elevation, shape = shape)
-         .background(color = backgroundColor, shape = shape)
-         .clickable(onClick = onClickIcon),
+         .shadow(
+            elevation = elevation, // Adjust this value to make the shadow larger/smaller
+            shape = shape,
+            clip = true // This handles the clipping, so you can remove your .clip() modifier
+         )
+         .background(color = backgroundColor)
+         .clickable(onClick = onClickIcon)
+         .then(modifier),
       contentAlignment = Alignment.Center
    ) {
       Icon(
          painter = icon,
          contentDescription = null,
          tint = iconTint,
-         modifier = Modifier.size(size * 0.5f) // icon ~50% of circle
+         modifier = Modifier.size(size * 0.5f).then(iconModifier) // icon ~50% of circle
       )
    }
 }
@@ -291,9 +313,13 @@ fun SelectedIcon(
                Color.Transparent
             }, shape = CircleShape
          )
+         .clickable(
+            onClick = onToggle,
+            indication = null,
+            interactionSource = null
+         )
          .clip(CircleShape)
-         .then(borderModifier)
-         .clickable(onClick = onToggle),
+         .then(borderModifier),
       contentAlignment = Alignment.Center
    ) {
       if (isSelected) {
@@ -321,7 +347,7 @@ fun TestPreview() {
       verticalAlignment = Alignment.CenterVertically,
    ) {
       val iconHeight = height * .015f
-      val contentColor = MaterialTheme.colorScheme.onSurface
+      val contentColor = HabitColors.Surface
       Icon(
          imageVector = Icons.Outlined.Add,
          modifier = Modifier.size(iconHeight),
@@ -342,18 +368,75 @@ fun TopBarPreview() {
       actions = {
          HabitIconBadge(
             icon = painterResource(R.drawable.search_icon),
-            backgroundColor = MaterialTheme.colorScheme.onSurface,
-            iconTint = Color(0xFF4A5565)
+            backgroundColor =  HabitColors.Surface,
+            iconTint = Color(0xFF4A5565),
+            elevation = 1.dp
+
          ) {}
+
          Spacer(Modifier.size(10.dp))
          HabitIconBadge(
             icon = rememberVectorPainter(Icons.Filled.MoreVert),
-            backgroundColor = MaterialTheme.colorScheme.onSurface,
-            iconTint = Color(0xFF4A5565)
+            backgroundColor =  HabitColors.Surface,
+            iconTint = Color(0xFF4A5565),
+            elevation = 1.dp
          ) {}
       }
 
    )
+}
+
+@Composable
+fun HabitScreenTopAppBar(onSearchClick: () -> Unit) {
+   Row(
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically,
+      modifier = Modifier
+         .background(Color.Transparent)
+         .fillMaxWidth()
+   ) {
+      Text(
+         text = "Habits",
+         style = MaterialTheme.typography.titleLarge.copy(
+            lineHeight = 28.sp,
+//                  fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
+            fontWeight = FontWeight(700),
+            color = Color(0xFF101828),
+         )
+      )
+
+      with(LocalSharedTransitionScope.current) {
+         Row(Modifier.background(Color.Transparent)) {
+            HabitIconBadge(
+               icon = painterResource(R.drawable.search_icon),
+               backgroundColor =  HabitColors.Surface,
+               iconTint = Color(0xFF4A5565),
+               size = 40.dp.scaledWidth(),
+               elevation = 5.dp,
+               modifier = Modifier.sharedBounds(
+                  sharedContentState = rememberSharedContentState(
+                     "search_bar"
+                  ), animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+
+                  resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds
+               ),
+               iconModifier = Modifier.sharedElement(
+                  sharedContentState = rememberSharedContentState(
+                     "search_bar_icon"
+                  ), animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
+               )
+            ) { onSearchClick() }
+            Spacer(Modifier.size(10.dp))
+            HabitIconBadge(
+               icon = rememberVectorPainter(Icons.Filled.MoreVert),
+               backgroundColor =  HabitColors.Surface,
+               iconTint = Color(0xFF4A5565),
+               elevation = 5.dp
+            ) {}
+         }
+      }
+
+   }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -362,38 +445,26 @@ fun HabitScreen(
    habitViewModel: HabitViewModel,
    onAddHabit: () -> Unit,
    onHabitClicked: (Int) -> Unit,
+   onSearchClick: () -> Unit,
 ) {
    val habitUiState by habitViewModel.displayedHabitUiState.collectAsStateWithLifecycle()
    val statsForToday by habitViewModel.habitScreenDayStats.collectAsStateWithLifecycle()
    val weeklyCompletionByDay by habitViewModel.weeklyCompletionByDay.collectAsStateWithLifecycle()
 
 
+
    Column(
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
       modifier = Modifier
+         .background(Color.Transparent)
          .padding(vertical = 8.dp.scaledHeight(), horizontal = 16.dp.scaledWidth())
    ) {
-      TopAppBar(
-         title = { Text("Habits") },
-         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-         actions = {
-            HabitIconBadge(
-               icon = painterResource(R.drawable.search_icon),
-               backgroundColor = MaterialTheme.colorScheme.onSurface,
-               iconTint = Color(0xFF4A5565),
-               size = 40.dp.scaledWidth()
-            ) {}
-            Spacer(Modifier.size(10.dp))
-            HabitIconBadge(
-               icon = rememberVectorPainter(Icons.Filled.MoreVert),
-               backgroundColor = MaterialTheme.colorScheme.onSurface,
-               iconTint = Color(0xFF4A5565)
-            ) {}
-         },
-         windowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
 
-         )
+      HabitScreenTopAppBar(
+
+         onSearchClick,
+      )
       HabitOverview(
          todayStats = statsForToday,
          weeklyCompletionByDay = weeklyCompletionByDay
@@ -449,15 +520,16 @@ fun HabitListNewUi(
 
    Column(
       modifier = Modifier
-         .shadow(elevation = 2.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
-         .shadow(elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .fillMaxWidth()
          .fillMaxHeight()
-         .background(
-            color = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(size = 16.dp)
+         .shadow(
+            elevation = 1.dp, // Adjust this value to make the shadow larger/smaller
+            shape = RoundedCornerShape(16.dp),
+            clip = true // This handles the clipping, so you can remove your .clip() modifier
          )
-         .clip(RoundedCornerShape(16.dp))
+         .background(
+            color =  HabitColors.Surface,
+         )
    ) {
       Row(
          modifier = Modifier
@@ -482,7 +554,7 @@ fun HabitListNewUi(
          Row(
 
             modifier = Modifier
-               .wrapContentHeight()
+               .fillMaxHeight()
                .clickable(onClick = onAddHabit),
             horizontalArrangement = Arrangement.spacedBy(4.dp.scaledWidth(), Alignment.Start),
             verticalAlignment = Alignment.CenterVertically,
@@ -491,11 +563,11 @@ fun HabitListNewUi(
                imageVector = Icons.Outlined.Add,
                modifier = Modifier.size(13.dp.scaledWidth()),
                contentDescription = "Add Habit Button",
-               tint = MaterialTheme.colorScheme.onPrimary
+               tint = HabitColors.PrimaryDark
             )
             Text(
                "Add Habits",
-               style = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onPrimary),
+               style = MaterialTheme.typography.labelSmall.copy(color = HabitColors.PrimaryDark),
 
                )
          }
@@ -637,10 +709,11 @@ fun HabitRowNewUi(
 
          SelectedIcon(
             icon = rememberVectorPainter(Icons.Rounded.Check),
-            backgroundColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            backgroundColor = HabitColors.Accent,
             size = 28.dp.scaledWidth(),
             isSelected = isToggled,
-            onToggle = onToggle
+            onToggle = onToggle,
+            modifier = Modifier
 
          )
       }
@@ -710,16 +783,19 @@ fun ArchivableHabitRowNewUi(
          }
          val revealedWidth = with(density) { abs(offsetPx.value).toDp() }
          Box(
-            modifier = Modifier.wrapContentSize(), // outer box still fills, but is fully transparent
+            modifier = Modifier
+               .fillMaxSize()
+               .background(Color(0xFFECF4EE)), // outer box still fills, but is fully transparent
             contentAlignment = Alignment.CenterEnd
          ) {
+
             Row(
                modifier = Modifier
                   .width(revealedWidth) // ← only the revealed sliver gets colored
-                  .padding(end = 8.dp.scaledWidth())
+                  .padding(vertical = 1.dp)
                   .fillMaxSize()
                   .background(
-                     if (isArchived) Color(0xFF19C760) else MaterialTheme.colorScheme.errorContainer,
+                     if (isArchived) Color(0xFF19C760) else HabitColors.Danger,
                      RoundedCornerShape(20.dp)
                   )
                   .clip(RoundedCornerShape(20.dp)),
@@ -731,7 +807,7 @@ fun ArchivableHabitRowNewUi(
                   Icon(
                      imageVector = if (isArchived) Icons.Outlined.Unarchive else Icons.Outlined.Archive,
                      contentDescription = if (isArchived) "UnArchive" else "Archive",
-                     tint = MaterialTheme.colorScheme.onErrorContainer,
+                     tint = HabitColors.Surface,
                      modifier = Modifier.graphicsLayer {
                         alpha = dismissState.progress
                      })
@@ -739,7 +815,6 @@ fun ArchivableHabitRowNewUi(
             }
          }
       }) {
-
       with(LocalSharedTransitionScope.current) {
          HabitRowNewUi(
             habitId = habitId,
@@ -748,6 +823,13 @@ fun ArchivableHabitRowNewUi(
             isToggled = isToggled,
             emoji = emoji,
             modifier = Modifier
+               .background(HabitColors.Surface)
+               .clip(RoundedCornerShape(4.dp))
+               .border(
+                  width = 0.5.dp,
+                  color = Color(0xFFECF4EE),
+                  shape = RoundedCornerShape(4.dp)
+               )
                .sharedBounds(
                   sharedContentState = rememberSharedContentState(
                      key = HabitSharedElementKey(
@@ -800,7 +882,7 @@ fun NewHabitRow(modifier: Modifier = Modifier) {
 
       SelectedIcon(
          icon = rememberVectorPainter(Icons.Rounded.Check),
-         backgroundColor = MaterialTheme.colorScheme.onPrimaryContainer,
+         backgroundColor = HabitColors.Accent,
          size = 28.dp.scaledWidth(),
       )
 

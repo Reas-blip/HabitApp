@@ -7,17 +7,18 @@ import android.learn.habitapp.data.local.Timeframe
 import android.learn.habitapp.data.repository.HabitRepository
 import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
-import android.learn.habitapp.util.FrequencyEvaluator.shouldNotifyToday
+import android.learn.habitapp.util.HabitStatsCalculator.calculateOverallCurrentStreak
+import android.learn.habitapp.util.HabitStatsCalculator.calculateOverallLongestStreak
+import android.learn.habitapp.util.HabitStatsCalculator.isScheduledToday
 import android.learn.habitapp.util.HabitStatsCalculator.weeklyCompletionByDay
 import android.learn.habitapp.util.calculateCurrentStreak
-import android.learn.habitapp.util.calculateOverallCurrentStreak
-import android.learn.habitapp.util.calculateOverallLongestStreak
 import android.learn.habitapp.util.getCurrentWeekStats
 import android.learn.habitapp.util.getStatsForCurrent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -45,40 +46,49 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    private val _uiEvent = MutableSharedFlow<UiEvent>()
    val uiEvent = _uiEvent.asSharedFlow()
 
-   val archivedHabitUiState: StateFlow<UiState> =
-      habitRepository.getArchivedHabitsWithLogs().map { rawData ->
-         UiState.Success(transformToUiState(rawData))
-      }.stateIn(
-         scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000),
-         initialValue = UiState.Loading
-      )
+   // ── SINGLE SOURCE OF TRUTH ──────────────────────────────────────────
+   // The only Room query for habit lists anywhere in this ViewModel.
+   // Shared (via stateIn) so every downstream flow below reads from the
+   // same one subscription instead of re-querying the database.
+   private val rawHabitsWithLogs: StateFlow<List<HabitWithLogs>> =
+      habitRepository.getAllHabitsRaw()
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+   // Active, non-archived, non-replaced — replaces every old getHabitsWithLogs() call.
+   private val activeHabitsWithLogs: Flow<List<HabitWithLogs>> = rawHabitsWithLogs
+      .map { list -> list.filter { !it.habit.isArchived && !it.habit.isReplaced } }
+
+   // Archived, non-replaced — replaces getArchivedHabitsWithLogs().
+   private val archivedHabitsWithLogs: Flow<List<HabitWithLogs>> = rawHabitsWithLogs
+      .map { list -> list.filter { it.habit.isArchived && !it.habit.isReplaced } }
+
+   // Not archived, but INCLUDES replaced versions — needed for accurate historical
+   // stats across frequency changes (this is what getAllHabitsWithLogs() used to be).
+   private val statsHabitsWithLogs: Flow<List<HabitWithLogs>> = rawHabitsWithLogs
+      .map { list -> list.filter { !it.habit.isArchived } }
+
+   // ── DERIVED UI STATE ─────────────────────────────────────────────────
+
+   val habitUiState: StateFlow<UiState> = activeHabitsWithLogs
+      .map { UiState.Success(transformToUiState(it)) }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
+
+   val archivedHabitUiState: StateFlow<UiState> = archivedHabitsWithLogs
+      .map { UiState.Success(transformToUiState(it)) }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
    private val _colorFilter = MutableStateFlow<Int?>(null)
    val colorFilter = _colorFilter.asStateFlow()
-   val habitUiState: StateFlow<UiState> = habitRepository.getHabitsWithLogs().map { rawData ->
-      UiState.Success(transformToUiState(rawData))
-   }.stateIn(
-      scope = viewModelScope,
-      started = SharingStarted.WhileSubscribed(5000),
-      initialValue = UiState.Loading
-   )
 
    val displayedHabitUiState: StateFlow<UiState> = combine(
       habitUiState, _colorFilter
    ) { rawState, filterColor ->
       if (rawState is UiState.Success) {
          val habits = rawState.habits
-         if (filterColor == null) {
-            UiState.Success(habits)
-         } else {
-            UiState.Success(habits.filter { it.color == filterColor })
-         }
-      } else {
-         rawState
-      }
+         if (filterColor == null) UiState.Success(habits)
+         else UiState.Success(habits.filter { it.color == filterColor })
+      } else rawState
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
-
 
    private val _searchQuery = MutableStateFlow("")
    val searchQuery = _searchQuery.asStateFlow()
@@ -88,106 +98,86 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    ) { rawState, query ->
       if (rawState is UiState.Success) {
          val habits = rawState.habits
-         if (query.isEmpty()) {
-            UiState.Success(habits)
-         } else {
-            UiState.Success(habits.filter { it.name.contains(query, ignoreCase = true) })
-         }
-      } else {
-         rawState
-      }
+         if (query.isEmpty()) UiState.Success(habits)
+         else UiState.Success(habits.filter { it.name.contains(query, ignoreCase = true) })
+      } else rawState
    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
 
-   val habitUiStateForTodayDate: StateFlow<UiState> =
-      habitRepository.getHabitsWithLogs().map { rawData ->
-         UiState.Success(transformToUiState(rawData.filter { habitWithLogs ->
-            shouldNotifyToday(habitWithLogs.habit, habitRepository)
-         }))
-      }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
+   // "Today's habits" — same active source as habitUiState, just further filtered.
+   // No repository dependency needed: shouldNotifyToday takes logs directly now.
+   val habitUiStateForTodayDate: StateFlow<UiState> = activeHabitsWithLogs
+      .map { list -> list.filter { isScheduledToday(it.habit) } }
+      .map { UiState.Success(transformToUiState(it)) }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState.Loading)
+
+   // ── STATS ────────────────────────────────────────────────────────────
 
    private val _selectedTimeframe = MutableStateFlow(Timeframe.WEEK)
    val selectedTimeframe = _selectedTimeframe.asStateFlow()
-
-   fun onTimeframeChanged(timeframe: Timeframe) {
-      _selectedTimeframe.value = timeframe
-   }
-
-   val overviewStats: StateFlow<OverviewStats> = combine(
-      habitRepository.getAllHabitsWithLogs(), // the raw List<HabitWithLogs> Flow
-      _selectedTimeframe
-   ) { habitsWithLogs, timeframe ->
-      getStatsForCurrent(habitsWithLogs, timeframe)
-   }.stateIn(
-      scope = viewModelScope,
-      started = SharingStarted.WhileSubscribed(5000),
-      initialValue = OverviewStats(
-         0,
-         0,
-         0,
-         emptyList()
-      ) // adjust to your actual OverviewStats constructor
-   )
-
-   val hasSeenSwipeHint: StateFlow<Boolean> = habitRepository.hasSeenSwipeHint.stateIn(
-      viewModelScope, SharingStarted.WhileSubscribed(5000), true
-   )
-   private val _scrollToHabitId = MutableStateFlow<Int?>(null)
-   val scrollToHabitId = _scrollToHabitId.asStateFlow()
-
-   val todayScreenWeekStats: StateFlow<OverviewStats> = habitRepository.getHabitsWithLogs()
-      .map { habitsWithLogs -> getCurrentWeekStats(habitsWithLogs) }
-      .stateIn(
-         scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000),
-         initialValue = OverviewStats(0, 0, 0, emptyList())
-      )
-   val habitScreenDayStats: StateFlow<OverviewStats> = habitRepository.getHabitsWithLogs()
-      .map { habitsWithLogs -> getStatsForCurrent(habitsWithLogs, timeframe = Timeframe.DAY) }
-      .stateIn(
-         scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000),
-         initialValue = OverviewStats(0, 0, 0, emptyList())
-      )
-
-   val weeklyCompletionByDay: StateFlow<Map<DayOfWeek, Boolean>> =
-      habitRepository.getHabitsWithLogs()
-         .map { habitsWithLogs -> weeklyCompletionByDay(habitsWithLogs) }
-         .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyMap()
-         )
-
-   val streakPair: StateFlow<Pair<Int, Int>> = habitRepository.getAllHabitsWithLogs()
-      .map { habitsWithLogs ->
-         val currentStreak = calculateOverallCurrentStreak(habitsWithLogs)
-         val longestStreak = calculateOverallLongestStreak(habitsWithLogs)
-         currentStreak to longestStreak
-      }
-      .stateIn(
-         scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000),
-         initialValue = 0 to 0
-      )
-
-
-   private val _statScreenTimeframe = MutableStateFlow(Timeframe.WEEK)
-   val statScreenOverviewStats: StateFlow<OverviewStats> = habitRepository.getAllHabitsWithLogs()
-      .map{ habitWithLogs ->
-         getStatsForCurrent(habitWithLogs, _statScreenTimeframe.value)
-
-      }.stateIn(
-         scope = viewModelScope,
-         started = SharingStarted.WhileSubscribed(5000),
-         initialValue = OverviewStats(0, 0, 0, emptyList())
-      )
 
    fun onStatScreenTimeframeChange(timeframe: Timeframe) {
       _statScreenTimeframe.value = timeframe
    }
 
-   fun onColorFilterChanged(color: Int?) {
+   val overviewStats: StateFlow<OverviewStats> = combine(
+      statsHabitsWithLogs, _selectedTimeframe
+   ) { habitsWithLogs, timeframe ->
+      getStatsForCurrent(habitsWithLogs, timeframe)
+   }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(5000),
+      OverviewStats(0, 0, 0, emptyList())
+   )
 
+   val todayScreenWeekStats: StateFlow<OverviewStats> = activeHabitsWithLogs
+      .map { habitsWithLogs -> getCurrentWeekStats(habitsWithLogs) }
+      .stateIn(
+         viewModelScope,
+         SharingStarted.WhileSubscribed(5000),
+         OverviewStats(0, 0, 0, emptyList())
+      )
+
+   val habitScreenDayStats: StateFlow<OverviewStats> = activeHabitsWithLogs
+      .map { habitsWithLogs -> getStatsForCurrent(habitsWithLogs, Timeframe.DAY) }
+      .stateIn(
+         viewModelScope,
+         SharingStarted.WhileSubscribed(5000),
+         OverviewStats(0, 0, 0, emptyList())
+      )
+
+   val weeklyCompletionByDay: StateFlow<Map<DayOfWeek, Boolean?>> = statsHabitsWithLogs
+      .map { habitsWithLogs -> weeklyCompletionByDay(habitsWithLogs) }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+   val streakPair: StateFlow<Pair<Int, Int>> = statsHabitsWithLogs
+      .map { habitsWithLogs ->
+         calculateOverallCurrentStreak(habitsWithLogs) to calculateOverallLongestStreak(
+            habitsWithLogs
+         )
+      }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0 to 0)
+
+   private val _statScreenTimeframe = MutableStateFlow(Timeframe.WEEK)
+   val statScreenOverviewStats: StateFlow<OverviewStats> = combine(
+      statsHabitsWithLogs, _statScreenTimeframe
+   ) { habitsWithLogs, timeframe ->
+      getStatsForCurrent(habitsWithLogs, timeframe)
+   }.stateIn(
+      viewModelScope,
+      SharingStarted.WhileSubscribed(5000),
+      OverviewStats(0, 0, 0, emptyList())
+   )
+
+
+   // ── ACTIONS ──────────────────────────────────────────────────────────
+
+   private val _scrollToHabitId = MutableStateFlow<Int?>(null)
+   val scrollToHabitId = _scrollToHabitId.asStateFlow()
+
+   val hasSeenSwipeHint: StateFlow<Boolean> = habitRepository.hasSeenSwipeHint
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+   fun onColorFilterChanged(color: Int?) {
       _colorFilter.value = if (_colorFilter.value == color) null else color
    }
 
@@ -210,11 +200,10 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
    fun onHabitChecked(habitId: Int) {
       viewModelScope.launch(Dispatchers.IO) {
          try {
-            val uiState = habitUiState.value as? UiState.Success ?: return@launch
-            val habit = uiState.habits.find { it.id == habitId } ?: return@launch
             val today = getStartOfTodayTimestamp()
+            val isDoneToday = habitRepository.getLogCountForDate(habitId, today) > 0
 
-            if (habit.isDoneToday) {
+            if (isDoneToday) {
                habitRepository.deleteHabitLog(habitId, today)
             } else {
                habitRepository.insertHabitLog(HabitLogsEntity(habitId = habitId, date = today))

@@ -5,6 +5,7 @@ import android.learn.habitapp.data.emoji.HabitEmojiData
 import android.learn.habitapp.data.local.FrequencyType
 import android.learn.habitapp.data.repository.HabitEmojiRepository
 import android.learn.habitapp.permissions.NotificationPermissionHandler
+import android.learn.habitapp.ui.theme.HabitColors
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -38,11 +39,15 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
@@ -50,6 +55,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
+import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
@@ -99,13 +105,12 @@ fun ColorPicker(
       Text(
          "Color",
          style = MaterialTheme.typography.labelLarge,
-         color = MaterialTheme.colorScheme.onSurfaceVariant,
+         color = HabitColors.TextSecondary,
          modifier = Modifier.padding(bottom = 8.dp)
       )
 
       LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
          item {
-            // "None" option — resets to default theme color
             ColorSwatch(
                color = null,
                isSelected = selectedColor == null,
@@ -133,11 +138,10 @@ private fun ColorSwatch(
       modifier = Modifier
          .size(40.dp)
          .clip(CircleShape)
-         .background(color ?: MaterialTheme.colorScheme.surfaceContainerHigh)
+         .background(color ?: HabitColors.SurfaceTint)
          .border(
             width = if (isSelected) 3.dp else 1.dp,
-            color = if (isSelected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            color = if (isSelected) HabitColors.Primary else HabitColors.Outline,
             shape = CircleShape
          )
          .clickable { onClick() },
@@ -148,7 +152,7 @@ private fun ColorSwatch(
             Icons.Outlined.Block,
             contentDescription = "No color",
             modifier = Modifier.size(20.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = HabitColors.TextSecondary
          )
       } else if (isSelected) {
          Icon(
@@ -161,6 +165,22 @@ private fun ColorSwatch(
    }
 }
 
+@Composable
+private fun habitFilterChipColors(selected: Boolean) = FilterChipDefaults.filterChipColors(
+   selectedContainerColor = HabitColors.Primary,
+   selectedLabelColor = Color.White,
+   containerColor = HabitColors.SurfaceTint,
+   labelColor = HabitColors.TextPrimary
+)
+
+@Composable
+private fun habitFilterChipBorder(selected: Boolean) = FilterChipDefaults.filterChipBorder(
+   enabled = true,
+   selected = selected,
+   borderColor = HabitColors.Outline,
+   selectedBorderColor = HabitColors.Primary
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HabitEmojiPickerSheet(
@@ -169,29 +189,22 @@ fun HabitEmojiPickerSheet(
    onCloseSheet: () -> Unit,
    sheetState: SheetState = rememberModalBottomSheetState()
 ) {
-   var searchQuery by rememberSaveable {
-      mutableStateOf("")
-   }
-
-   var selectedCategory by rememberSaveable {
-      mutableStateOf("Fitness")
-   }
+   var searchQuery by rememberSaveable { mutableStateOf("") }
+   var selectedCategory by rememberSaveable { mutableStateOf("Fitness") }
    val categories = HabitEmojiData.categories
 
-   val currentCategory = categories.first {
-      it.name == selectedCategory
-   }
-
+   val currentCategory = categories.first { it.name == selectedCategory }
 
    val IosSnappySpring = spring<Dp>(
-      dampingRatio = 0.75f,      // Bouncy enough to feel alive, tight enough to remain professional
-      stiffness = 600f          // Rapid acceleration towards the target size
+      dampingRatio = 0.75f,
+      stiffness = 600f
    )
+
    ModalBottomSheet(
       modifier = Modifier,
       onDismissRequest = onDismissRequest,
       sheetState = sheetState,
-      containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+      containerColor = HabitColors.Surface
    ) {
       Column(
          modifier = Modifier
@@ -202,6 +215,7 @@ fun HabitEmojiPickerSheet(
          Text(
             text = "Choose Habit Icon",
             style = MaterialTheme.typography.titleMedium,
+            color = HabitColors.TextPrimary,
             modifier = Modifier.padding(bottom = 16.dp)
          )
          val focusManager = LocalFocusManager.current
@@ -213,17 +227,14 @@ fun HabitEmojiPickerSheet(
          ) {
             item("search") {
                val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-
                var isFocused by remember { mutableStateOf(false) }
 
                val animatedWidth by animateDpAsState(
                   targetValue = if (isFocused) screenWidth * 0.6f else 120.dp,
-                  animationSpec = IosSnappySpring, // Smooth 300ms transition
+                  animationSpec = IosSnappySpring,
                   label = "SearchBarWidth"
                )
-               // Track the scaling font size starting from a base value (e.g., 14sp or 16sp)
                var currentFontSize by remember { mutableFloatStateOf(14f) }
-               // Reset text size when query clears or focus shifts to avoid getting permanently stuck small
                LaunchedEffect(searchQuery) {
                   if (searchQuery.isEmpty()) currentFontSize = 14f
                }
@@ -236,27 +247,25 @@ fun HabitEmojiPickerSheet(
                      .width(animatedWidth)
                      .onFocusChanged { isFocused = it.isFocused },
                   singleLine = true,
-                  cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                  cursorBrush = SolidColor(HabitColors.Primary),
                   textStyle = TextStyle(
                      fontFamily = MaterialTheme.typography.displaySmall.fontFamily,
                      fontWeight = MaterialTheme.typography.displaySmall.fontWeight,
-                     fontSize = currentFontSize.sp,                 // Dynamic Font Size
-                     lineHeight = currentFontSize.sp,               // FORCE cursor to match text height
-                     platformStyle = PlatformTextStyle(
-                        includeFontPadding = false                 // Strips weird OS font padding misalignment
-                     ),
-                     color = MaterialTheme.colorScheme.onSurface
+                     fontSize = currentFontSize.sp,
+                     lineHeight = currentFontSize.sp,
+                     platformStyle = PlatformTextStyle(includeFontPadding = false),
+                     color = if (isFocused) HabitColors.TextPrimary else Color.White
                   ),
                   decorationBox = { innerTextField ->
                      Row(
                         modifier = Modifier
                            .background(
-                              color = if (isFocused) Color.Transparent else Color(0xFF615D6B),
+                              color = if (isFocused) Color.Transparent else HabitColors.PrimaryDark,
                               shape = RoundedCornerShape(50)
                            )
                            .border(
                               width = if (isFocused) 1.dp else 0.dp,
-                              color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                              color = if (isFocused) HabitColors.Primary else Color.Transparent,
                               shape = RoundedCornerShape(50)
                            )
                            .padding(horizontal = 12.dp)
@@ -266,17 +275,17 @@ fun HabitEmojiPickerSheet(
                         Icon(
                            Icons.Default.Search,
                            contentDescription = null,
-                           tint = if (isFocused) MaterialTheme.colorScheme.primary else Color.White
+                           tint = if (isFocused) HabitColors.Primary else Color.White
                         )
-
                         Spacer(modifier = Modifier.width(8.dp))
-
                         Box(
-                           modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart
+                           modifier = Modifier.weight(1f),
+                           contentAlignment = Alignment.CenterStart
                         ) {
                            if (searchQuery.isEmpty()) {
                               Text(
-                                 text = "Search emojis", style = TextStyle(
+                                 text = "Search emojis",
+                                 style = TextStyle(
                                     fontFamily = MaterialTheme.typography.displaySmall.fontFamily,
                                     fontWeight = MaterialTheme.typography.displaySmall.fontWeight,
                                     fontSize = currentFontSize.sp,
@@ -293,17 +302,22 @@ fun HabitEmojiPickerSheet(
             }
 
             items(categories) { category ->
-               FilterChip(selected = selectedCategory == category.name, onClick = {
-                  focusManager.clearFocus()
-                  selectedCategory = category.name
-               }, label = { Text("${category.icon} ${category.name}") })
+               val selected = selectedCategory == category.name
+               FilterChip(
+                  selected = selected,
+                  onClick = {
+                     focusManager.clearFocus()
+                     selectedCategory = category.name
+                  },
+                  label = { Text("${category.icon} ${category.name}") },
+                  colors = habitFilterChipColors(selected),
+                  border = habitFilterChipBorder(selected)
+               )
             }
          }
-         AnimatedContent(targetState = selectedCategory) { category ->
 
-            val filteredEmojis: List<HabitEmoji> = remember(
-               category, searchQuery
-            ) {
+         AnimatedContent(targetState = selectedCategory) { category ->
+            val filteredEmojis: List<HabitEmoji> = remember(category, searchQuery) {
                val items = HabitEmojiRepository.getByCategory(selectedCategory)
                HabitEmojiRepository.search(searchQuery, items)
             }
@@ -311,28 +325,25 @@ fun HabitEmojiPickerSheet(
                modifier = Modifier
                   .height(300.dp)
                   .clickable(
-                     interactionSource = remember { MutableInteractionSource() }, indication = null
-                  ) {
-                     focusManager.clearFocus()
-                  },
+                     interactionSource = remember { MutableInteractionSource() },
+                     indication = null
+                  ) { focusManager.clearFocus() },
                columns = GridCells.Adaptive(56.dp),
                horizontalArrangement = Arrangement.spacedBy(8.dp),
                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-
-               items(
-                  filteredEmojis,
-                  key = { it.emoji + it.keywords.joinToString() },
-               ) { emoji ->
-
+               items(filteredEmojis, key = { it.emoji + it.keywords.joinToString() }) { emoji ->
                   FilledTonalIconButton(
                      onClick = {
                         onEmojiSelected(emoji.emoji)
                         onCloseSheet()
-                     }) {
-                     Text(
-                        emoji.emoji, fontSize = 24.sp
+                     },
+                     colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = HabitColors.SurfaceTint,
+                        contentColor = HabitColors.TextPrimary
                      )
+                  ) {
+                     Text(emoji.emoji, fontSize = 24.sp)
                   }
                }
             }
@@ -346,20 +357,20 @@ fun HabitEmojiPickerSheet(
 fun ReminderPicker(
    reminderTime: LocalTime?,
    onReminderChange: (LocalTime?) -> Unit,
-   canScheduleExactAlarms: () -> Boolean,      // ← new param
+   canScheduleExactAlarms: () -> Boolean,
    onRequestExactAlarmPermission: () -> Unit,
    modifier: Modifier = Modifier
 ) {
    var showPicker by remember { mutableStateOf(false) }
-
    var showPermissionRequest by remember { mutableStateOf(false) }
 
    if (showPermissionRequest) {
       NotificationPermissionHandler { granted ->
          showPermissionRequest = false
-         showPicker = true // open the time picker regardless of the result
+         showPicker = true
       }
    }
+
    Row(
       modifier = modifier
          .fillMaxWidth()
@@ -368,17 +379,44 @@ fun ReminderPicker(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.SpaceBetween
    ) {
-      Column {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
          Text(
             "Reminder",
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = HabitColors.TextSecondary
          )
-         Text(reminderTime?.format(DateTimeFormatter.ofPattern("h:mm a")) ?: "Off", style = MaterialTheme.typography.bodyLarge)
-      }
-      if (reminderTime != null) {
-         IconButton(onClick = { onReminderChange(null) }) {
-            Icon(Icons.Default.Close, contentDescription = "Remove reminder")
+
+         Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+
+         ) {
+            Button(
+               onClick = {
+                  showPermissionRequest = true
+               },
+               colors = ButtonDefaults.buttonColors(
+                  containerColor = HabitColors.Primary,
+                  contentColor = Color.White
+               ),
+               shape = RoundedCornerShape(8.dp)
+            ) {
+
+               Text(
+                  reminderTime?.format(DateTimeFormatter.ofPattern("h:mm a")) ?: "Off",
+                  style = MaterialTheme.typography.bodyLarge,
+               )
+            }
+            if (reminderTime != null) {
+               IconButton(onClick = { onReminderChange(null) }) {
+                  Icon(
+                     Icons.Default.Close,
+                     contentDescription = "Remove reminder",
+                     tint = HabitColors.Danger
+                  )
+               }
+            }
          }
       }
    }
@@ -390,30 +428,43 @@ fun ReminderPicker(
       )
 
       Dialog(onDismissRequest = { showPicker = false }) {
-         Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surfaceContainerHigh
-         ) {
+         Surface(shape = RoundedCornerShape(28.dp), color = HabitColors.Surface) {
             Column(
                modifier = Modifier.padding(24.dp),
                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-               TimePicker(state = timePickerState)
+               TimePicker(
+                  state = timePickerState,
+                  colors = TimePickerDefaults.colors(
+                     clockDialColor = HabitColors.PrimaryDark,
+                     selectorColor = HabitColors.BackgroundTop,
+                     containerColor = HabitColors.SurfaceTint,
+                     periodSelectorSelectedContainerColor = HabitColors.PrimaryDark,
+                     periodSelectorSelectedContentColor = Color.White,
+                     timeSelectorSelectedContainerColor = HabitColors.PrimaryDark,
+                     timeSelectorSelectedContentColor = Color.White,
+                     timeSelectorUnselectedContainerColor = HabitColors.BackgroundBottom,
+                     timeSelectorUnselectedContentColor = HabitColors.TextPrimary
+                  )
+               )
                Row(
                   modifier = Modifier
                      .fillMaxWidth()
                      .padding(top = 16.dp),
                   horizontalArrangement = Arrangement.End
                ) {
-                  TextButton(onClick = { showPicker = false }) { Text("Cancel") }
+                  TextButton(onClick = { showPicker = false }) {
+                     Text("Cancel", color = HabitColors.TextSecondary)
+                  }
                   TextButton(onClick = {
                      onReminderChange(LocalTime.of(timePickerState.hour, timePickerState.minute))
                      showPicker = false
-
                      if (!canScheduleExactAlarms()) {
                         onRequestExactAlarmPermission()
                      }
-                  }) { Text("Set") }
+                  }) {
+                     Text("Set", color = HabitColors.PrimaryDark)
+                  }
                }
             }
          }
@@ -435,26 +486,30 @@ fun FrequencyPicker(
       Text(
          "Frequency",
          style = MaterialTheme.typography.labelLarge,
-         color = MaterialTheme.colorScheme.onSurfaceVariant,
+         color = HabitColors.TextSecondary,
          modifier = Modifier.padding(bottom = 8.dp)
       )
 
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
          FrequencyType.entries.forEach { type ->
+            val selected = frequencyType == type
             FilterChip(
-               selected = frequencyType == type,
+               selected = selected,
                onClick = { onFrequencyTypeChange(type) },
-               label = { Text(type.label()) })
+               label = { Text(type.label()) },
+               colors = habitFilterChipColors(selected),
+               border = habitFilterChipBorder(selected)
+            )
          }
       }
 
       AnimatedVisibility(visible = frequencyType == FrequencyType.SPECIFIC_DAYS) {
          DayOfWeekSelector(
-            selectedDays = customDays, onDayToggle = { day ->
-               onCustomDaysChange(
-                  if (day in customDays) customDays - day else customDays + day
-               )
-            }, modifier = Modifier.padding(top = 12.dp)
+            selectedDays = customDays,
+            onDayToggle = { day ->
+               onCustomDaysChange(if (day in customDays) customDays - day else customDays + day)
+            },
+            modifier = Modifier.padding(top = 12.dp)
          )
       }
 
@@ -468,6 +523,7 @@ fun FrequencyPicker(
    }
 }
 
+
 private fun FrequencyType.label(): String = when (this) {
    FrequencyType.DAILY -> "Daily"
    FrequencyType.SPECIFIC_DAYS -> "Specific days"
@@ -476,26 +532,21 @@ private fun FrequencyType.label(): String = when (this) {
 
 @Composable
 private fun DayOfWeekSelector(
-
    selectedDays: Set<DayOfWeek>, onDayToggle: (DayOfWeek) -> Unit, modifier: Modifier = Modifier
 ) {
-   Row(
-      modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween
-   ) {
+   Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
       DayOfWeek.entries.forEach { day ->
          val selected = day in selectedDays
          Surface(
             onClick = { onDayToggle(day) },
             shape = CircleShape,
-            color = if (selected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.surfaceContainerHigh,
+            color = if (selected) HabitColors.Primary else HabitColors.SurfaceTint,
             modifier = Modifier.size(40.dp)
          ) {
             Box(contentAlignment = Alignment.Center) {
                Text(
-                  day.name.take(1), // M T W T F S S
-                  color = if (selected) MaterialTheme.colorScheme.onPrimary
-                  else MaterialTheme.colorScheme.onSurface,
+                  day.name.take(1),
+                  color = if (selected) Color.White else HabitColors.TextSecondary,
                   style = MaterialTheme.typography.labelMedium
                )
             }
@@ -514,14 +565,15 @@ private fun TimesPerWeekStepper(
       horizontalArrangement = Arrangement.spacedBy(16.dp)
    ) {
       IconButton(onClick = { if (value > 1) onValueChange(value - 1) }) {
-         Icon(Icons.Default.Remove, contentDescription = "Decrease")
+         Icon(Icons.Default.Remove, contentDescription = "Decrease", tint = HabitColors.PrimaryDark)
       }
       Text(
          "$value ${if (value == 1) "time" else "times"} / week",
-         style = MaterialTheme.typography.bodyLarge
+         style = MaterialTheme.typography.bodyLarge,
+         color = HabitColors.TextPrimary
       )
       IconButton(onClick = { if (value < 7) onValueChange(value + 1) }) {
-         Icon(Icons.Default.Add, contentDescription = "Increase")
+         Icon(Icons.Default.Add, contentDescription = "Increase", tint = HabitColors.PrimaryDark)
       }
    }
 }

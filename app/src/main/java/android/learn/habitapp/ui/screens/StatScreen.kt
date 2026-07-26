@@ -1,7 +1,10 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.screens
 
+import android.learn.habitapp.HabitViewModel
 import android.learn.habitapp.data.local.HabitStatItem
 import android.learn.habitapp.data.local.Timeframe
+import android.learn.habitapp.ui.theme.HabitColors
+import androidx.compose.animation.Animatable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -18,16 +21,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,9 +38,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +50,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -72,6 +75,7 @@ fun StatsScreen(habitViewModel: HabitViewModel) {
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
       modifier = Modifier
+         .background(Color.Transparent)
          .padding(vertical = 8.dp.scaledHeight(), horizontal = 16.dp.scaledWidth())
    ) {
 
@@ -85,8 +89,6 @@ fun StatsScreen(habitViewModel: HabitViewModel) {
          percent = statScreenOverviewStats.successRatePercent
       )
       CompletionByHabit(statScreenOverviewStats.habitStats)
-
-
 
 
    }
@@ -106,22 +108,20 @@ fun SegmentedControl(
    // 1. Properly hoist and track state matching your signature
    var selectedSegment by remember { mutableStateOf(initialSelected) }
 
+   val coroutineScope = rememberCoroutineScope()
    SharedTransitionLayout {
       Row(
          horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.Start),
          verticalAlignment = Alignment.CenterVertically,
          modifier = Modifier
-            .statusBarsPadding()
-            .shadow(
-               elevation = 2.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000)
-            )
-            .shadow(
-               elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000)
-            )
-            .wrapContentWidth() // Adjusted slightly from 182.dp to comfortably fit 4 long labels
+            .width(180.dp) // Adjusted slightly from 182.dp to comfortably fit 4 long labels
             .height(38.dp) // Adjusted slightly from 32.dp to accommodate 4.dp padding + comfortable heights
-            .clip(shape = RoundedCornerShape(50))
-            .background(color = Color(0xFFFFFFFF))
+            .shadow(
+               elevation = 2.dp, // Adjust this value to make the shadow larger/smaller
+               shape = RoundedCornerShape(50),
+               clip = true // This handles the clipping, so you can remove your .clip() modifier
+            )
+            .background(color = HabitColors.Surface)
             .padding(4.dp)
       ) {
          segments.forEach { segment ->
@@ -175,6 +175,10 @@ fun SegmentedControl(
                Box(
                   modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center
                ) {
+                  val textColor = remember { Animatable(Color.Gray) }
+                  LaunchedEffect(isSelected) {
+                     if (isSelected) textColor.animateTo(Color.White)
+                  }
                   Text(
                      text = segment,
                      color = if (isSelected) Color.White else Color.Gray,
@@ -235,7 +239,6 @@ fun HabitStatOverview(
    longestStreak: Int,
    percent: Int
 ) {
-
    Column(
       verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
@@ -245,8 +248,8 @@ fun HabitStatOverview(
          )
          .shadow(elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .fillMaxWidth()
-         .wrapContentHeight()
-         .background(color = Color(0xFFFFFFFF), shape = RoundedCornerShape(size = 16.dp))
+         .height(200.dp)
+         .background(color = HabitColors.Surface, shape = RoundedCornerShape(size = 16.dp))
          .padding(16.dp)
    ) {
       Text(
@@ -254,7 +257,7 @@ fun HabitStatOverview(
          style = MaterialTheme.typography.labelMedium.copy(
 //            fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
             fontWeight = FontWeight(600),
-            color = Color(0xFF99A1AF),
+            color = HabitColors.TextSecondary,
             letterSpacing = 0.6.sp,
          )
       )
@@ -262,26 +265,30 @@ fun HabitStatOverview(
          horizontalArrangement = Arrangement.SpaceBetween,
          verticalAlignment = Alignment.Top,
          modifier = Modifier
-            .padding(top = 12.dp.scaledWidth())
-            .wrapContentHeight()
+            .padding(top = 28.dp.scaledWidth())
+//            .padding(16.dp)
             .fillMaxWidth()
       ) {
          Stat(
             emoji = "✅",
             statInfo = "$percent",
-            statDescription = "Success Rate"
+            statDescription = "Success Rate",
+            modifier = Modifier.weight(1f)
+
          )
 
          Stat(
             emoji = "🔥",
             statInfo = "$currentStreak",
-            statDescription = "Current Streak"
+            statDescription = "Current Streak",
+                    modifier = Modifier.weight(1f)
          )
 
          Stat(
             emoji = "🏆",
             statInfo = "$longestStreak",
-            statDescription = "Longest Streak"
+            statDescription = "Longest Streak",
+            modifier = Modifier.weight(1f)
          )
       }
 
@@ -299,7 +306,7 @@ fun CompletionByHabit(
          .shadow(elevation = 2.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .shadow(elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .fillMaxWidth()
-         .background(color = Color(0xFFFFFFFF), shape = RoundedCornerShape(size = 16.dp))
+         .background(color = HabitColors.Surface, shape = RoundedCornerShape(size = 16.dp))
          .padding(16.dp)
    ) {
       Text(
@@ -307,7 +314,7 @@ fun CompletionByHabit(
          style = MaterialTheme.typography.labelMedium.copy(
 //            fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
             fontWeight = FontWeight(600),
-            color = Color(0xFF99A1AF),
+            color = HabitColors.TextSecondary,
             letterSpacing = 0.6.sp,
          )
       )
@@ -317,11 +324,10 @@ fun CompletionByHabit(
          HabitCompletion(
             habitName = it.habitName,
             habitEmoji = it.habitEmoji,
-            color = Color(colorInt.toInt()) ,
+            color = Color(colorInt.toInt()),
             completionPercent = it.completionPercent
          )
       }
-
 
 
    }
@@ -347,12 +353,12 @@ fun HabitCompletion(
          modifier = Modifier
             .size(28.dp)
             .clip(CircleShape)
-            .background(color)
+            .background(color.copy(alpha = .2f))
       ) {
          Text(
             text = habitEmoji, style = TextStyle(
-               fontSize = 18.sp,
-               lineHeight = 28.sp,
+               fontSize = 12.sp,
+               lineHeight = 18.sp,
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
                fontWeight = FontWeight(400),
                color = Color(0xFF111827),
@@ -360,34 +366,41 @@ fun HabitCompletion(
          )
 
       }
-      Row(
-         horizontalArrangement = Arrangement.SpaceBetween,
-         verticalAlignment = Alignment.Top,
+      Column(
+         modifier = Modifier.fillMaxWidth()
       ) {
-         Text(
-            text = habitName,
-            style = MaterialTheme.typography.labelMedium.copy(
-               color = Color(0xFF364153),
-            )
+         Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.fillMaxWidth()
+         ) {
+            Text(
+               text = habitName,
+               style = MaterialTheme.typography.labelMedium.copy(
+                  color = Color(0xFF364153),
+               )
 
-         )
-         Text(
-            text = "$completionPercent%",
-            style = MaterialTheme.typography.labelMedium.copy(
-               fontWeight = FontWeight(700),
-               color = Color(0xFF6A7282),
             )
+            Text(
+               text = "$completionPercent%",
+               style = MaterialTheme.typography.labelMedium.copy(
+                  fontWeight = FontWeight(700),
+                  color = Color(0xFF6A7282),
+               )
+            )
+         }
+
+         Spacer(Modifier.size(4.dp))
+         LinearProgressIndicator(
+            progress = { (completionPercent / 100f) },
+            modifier = Modifier.fillMaxWidth(),
+            color = color,
+            gapSize = (-10).dp,
+            trackColor = Color(0xFFF3F4F6),
+            strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
+            drawStopIndicator = {}
          )
       }
-
-      LinearProgressIndicator(
-         progress = { (completionPercent / 100f) },
-         modifier = Modifier,
-         color = color,
-         trackColor = ProgressIndicatorDefaults.linearTrackColor,
-         strokeCap = ProgressIndicatorDefaults.LinearStrokeCap,
-         drawStopIndicator = {}
-      )
 
    }
 
@@ -400,12 +413,12 @@ fun Stat(
    emoji: String = "✅",
    statInfo: String = "78%",
    statDescription: String = "Success Rate",
+   modifier: Modifier = Modifier
 ) {
    Column(
       verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.Top),
       horizontalAlignment = Alignment.CenterHorizontally,
-      modifier = Modifier
-         .width(65.dp.scaledWidth())
+      modifier = modifier
          .fillMaxHeight()
    ) {
       Box(
@@ -440,7 +453,7 @@ fun Stat(
             lineHeight = 12.5.sp,
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
             fontWeight = FontWeight(400),
-            color = Color(0xFF99A1AF),
+            color = HabitColors.TextSecondary,
             textAlign = TextAlign.Center,
          )
       )

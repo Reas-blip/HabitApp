@@ -152,7 +152,7 @@ private val LightColorScheme = lightColorScheme(
    primaryContainer = Color(0xFFF3F4F6),
    onPrimaryContainer = Color(0xFF4CAF50),
    surface = Color(0xFFF0F7F1),
-   onSurface = Color(0xFFFFFFFF),
+   onSurface = HabitColors.Surface,
 
    secondary = PurpleGrey40,
    secondaryContainer = Color(0xFF1B5E20),

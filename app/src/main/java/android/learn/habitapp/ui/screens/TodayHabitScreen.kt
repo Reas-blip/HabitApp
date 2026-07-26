@@ -1,9 +1,12 @@
-package android.learn.habitapp
+package android.learn.habitapp.ui.screens
 
+import android.learn.habitapp.HabitViewModel
+import android.learn.habitapp.R
 import android.learn.habitapp.data.local.OverviewStats
 import android.learn.habitapp.ui.UiState
 import android.learn.habitapp.ui.components.ErrorScreen
 import android.learn.habitapp.ui.components.LoadingSpinner
+import android.learn.habitapp.ui.theme.HabitColors
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +54,7 @@ fun TodayHabitScreen(
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
       modifier = Modifier
-         .background(MaterialTheme.colorScheme.surface)
+         .background(Color.Transparent)
          .padding(vertical = 8.dp.scaledHeight(), horizontal = 16.dp.scaledWidth())
    ) {
       OverallProgressCard(weekStats = todayScreenWeekStats)
@@ -89,13 +92,13 @@ fun OverallProgressCard(
 
    val statTitleStyle = MaterialTheme.typography.headlineSmall.copy(
       fontWeight = FontWeight(700),
-      color = MaterialTheme.colorScheme.onSecondaryContainer,
+      color = HabitColors.Surface,
       textAlign = TextAlign.Center
    )
 
    val statSubtitleStyle = MaterialTheme.typography.labelSmall.copy(
       fontWeight = FontWeight(400),
-      color = MaterialTheme.colorScheme.onSecondaryContainer,
+      color = HabitColors.Surface,
       textAlign = TextAlign.Center
    )
 
@@ -105,10 +108,10 @@ fun OverallProgressCard(
       modifier = modifier
          .fillMaxWidth()
          .height(214.dp.scaledHeight())
-         .background(
-            color = MaterialTheme.colorScheme.secondaryContainer,
+         .clip(
             shape = RoundedCornerShape(size = 24.dp)
          )
+         .background(HabitColors.PrimaryDark)
          .padding(20.dp.scaledWidth())
          .padding(top = 4.dp.scaledHeight())
    ) {
@@ -127,15 +130,15 @@ fun OverallProgressCard(
                style = MaterialTheme.typography.titleSmall.copy(
 //                     fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
                   fontWeight = FontWeight(400),
-                  color = MaterialTheme.colorScheme.onSecondaryContainer,
+                  color = HabitColors.Surface,
                )
             )
             Text(
                text = "Keep the momentum going!",
                style = MaterialTheme.typography.bodySmall.copy(
 //                     fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
-                  fontWeight = FontWeight(400),
-                  color = MaterialTheme.colorScheme.onSecondaryContainer,
+                  fontWeight = FontWeight(100),
+                  color = HabitColors.Surface,
                )
             )
 
@@ -143,20 +146,20 @@ fun OverallProgressCard(
 
          HabitIconBadge(
             icon = painterResource(R.drawable.settings_icon),
-            backgroundColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = .1f),
-            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+            backgroundColor = HabitColors.PrimaryDark.copy(alpha = .9f),
+            iconTint = HabitColors.Surface,
             size = 36.dp.scaledWidth(),
-            elevation = 0.dp
+            elevation = 2.dp
 
          )
       }
       Text(
          text = "Overall Progress".uppercase(),
-         style = MaterialTheme.typography.bodySmall.copy(
+         style = MaterialTheme.typography.bodyMedium.copy(
 //               fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
             fontWeight = FontWeight(600),
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            letterSpacing = 0.6.sp,
+            color = HabitColors.Surface,
+            letterSpacing = 2.sp,
          ),
          modifier = Modifier.padding(top = 12.dp.scaledHeight())
       )
@@ -169,6 +172,7 @@ fun OverallProgressCard(
          OverViewProgressBar(
             titleText = "${weekStats.successRatePercent}%",
             titleStyle = MaterialTheme.typography.bodyLarge.copy(
+               fontSize = 20.sp,
                fontWeight = FontWeight(700),
                color = Color(0xFF1E2939),
             ),
@@ -177,9 +181,10 @@ fun OverallProgressCard(
                fontSize = 9.sp,
                lineHeight = 13.5.sp,
                fontWeight = FontWeight(400),
-               color = Color(0xFF99A1AF),
+               color = HabitColors.Surface,
             ),
-            progress = .6f
+            progress = weekStats.successRatePercent / 100f,
+            size = 90.dp
          )
 
          Row(
@@ -211,31 +216,34 @@ fun OverallProgressCard(
 }
 
 @Composable
-fun WeekOverviewCard(weeklyCompletionByDay: Map<DayOfWeek, Boolean>) {
+fun WeekOverviewCard(weeklyCompletionByDay: Map<DayOfWeek, Boolean?>) {
    val selectedDays = weeklyCompletionByDay.filter { entries ->
-      entries.value
+      entries.value == true
    }.keys
 
    Column(
       verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
       modifier = Modifier
-         .shadow(elevation = 2.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
-         .shadow(elevation = 3.dp, spotColor = Color(0x1A000000), ambientColor = Color(0x1A000000))
          .fillMaxWidth()
          .height(115.dp.scaledHeight())
+         .shadow(
+            elevation = 2.dp, // Adjust this value to make the shadow larger/smaller
+            shape = RoundedCornerShape(16.dp),
+            clip = true // This handles the clipping, so you can remove your .clip() modifier
+         )
          .background(
-            color = MaterialTheme.colorScheme.onSurface,
-            shape = RoundedCornerShape(size = 16.dp)
+            color = HabitColors.Surface,
          )
          .padding(16.dp.scaledWidth())
+
    ) {
       Text(
          text = "This Week".uppercase(),
          style = MaterialTheme.typography.labelMedium.copy(
 //            fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
             fontWeight = FontWeight(600),
-            color = Color(0xFF99A1AF),
+            color = HabitColors.TextSecondary,
             letterSpacing = 0.6.sp,
          )
       )
@@ -256,13 +264,13 @@ fun WeekOverviewCard(weeklyCompletionByDay: Map<DayOfWeek, Boolean>) {
                   style = MaterialTheme.typography.labelMedium.copy(
                      //                  fontFamily = FontFamily(Font(R.font.plus_jakarta_sans)),
                      fontWeight = FontWeight(500),
-                     color = Color(0xFF99A1AF),
+                     color = HabitColors.TextSecondary,
                   )
                )
                SelectedDayIcon(
                   icon = painterResource(R.drawable.check_icon),
-                  backgroundColor = MaterialTheme.colorScheme.onPrimary,
-                  iconTint = MaterialTheme.colorScheme.primaryContainer,
+                  backgroundColor = HabitColors.PrimaryDark,
+                  iconTint = HabitColors.Surface,
                   size = 32.dp,
                   isSelected = selected,
                )
@@ -311,7 +319,7 @@ fun SelectedDayIcon(
          Box(
             Modifier
                .clip(CircleShape)
-               .background(color = Color(0xFFF3F4F6))
+               .background(color = HabitColors.SurfaceTintDark.copy(alpha = .9f))
          ) {
             Box(
                Modifier
