@@ -123,9 +123,7 @@ fun CustomSearchHabitBarNewUi(
                   modifier = Modifier
                      .size(20.dp.scaledWidth())
                      .sharedElement(
-                        sharedContentState = rememberSharedContentState(
-                           "search_bar_icon"
-                        ),
+                        sharedContentState = rememberSharedContentState("search_bar_icon"),
                         animatedVisibilityScope = LocalAnimatedVisibilityScope.current,
                      ),
                   tint = MaterialTheme.colorScheme.onSurfaceVariant

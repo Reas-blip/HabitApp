@@ -5,12 +5,16 @@ import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.local.HabitLogsEntity
 import android.learn.habitapp.data.local.HabitPreferences
 import android.learn.habitapp.data.local.HabitWithLogs
+import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
 interface HabitRepository {
    // HabitRepository
    suspend fun unarchiveHabit(habitId: Int)
+   suspend fun deleteAllHabits()
+
+   suspend fun deleteAllLogs()
 
 
    suspend fun insertHabit(habit: HabitEntity): Long
@@ -50,6 +54,7 @@ class HabitRepositoryImpl @Inject constructor(
    override suspend fun insertHabit(habit: HabitEntity): Long {
       return habitDao.insertHabit(habit)
    }
+
 
    override fun getAllHabitsRaw(): Flow<List<HabitWithLogs>> = habitDao.getAllHabitsRaw()
 
@@ -113,6 +118,14 @@ class HabitRepositoryImpl @Inject constructor(
 
    override suspend fun unarchiveHabit(habitId: Int) {
       habitDao.unarchiveHabit(habitId)
+   }
+
+   override suspend fun deleteAllHabits() {
+      habitDao.deleteAllHabits()
+   }
+
+   override suspend fun deleteAllLogs() {
+      habitDao.deleteAllLogs()
    }
 
    override suspend fun updateSortOrder(habitId: Int, newOrder: Int) {

@@ -1,5 +1,7 @@
 package android.learn.habitapp
 
+import android.learn.habitapp.data.local.FrequencyType
+import android.learn.habitapp.data.local.HabitEntity
 import android.learn.habitapp.data.local.HabitLogsEntity
 import android.learn.habitapp.data.local.HabitWithLogs
 import android.learn.habitapp.data.local.OverviewStats
@@ -7,10 +9,13 @@ import android.learn.habitapp.data.local.Timeframe
 import android.learn.habitapp.data.repository.HabitRepository
 import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
+import android.learn.habitapp.util.HabitBackupDto
+import android.learn.habitapp.util.BackupPayload
 import android.learn.habitapp.util.HabitStatsCalculator.calculateOverallCurrentStreak
 import android.learn.habitapp.util.HabitStatsCalculator.calculateOverallLongestStreak
 import android.learn.habitapp.util.HabitStatsCalculator.isScheduledToday
 import android.learn.habitapp.util.HabitStatsCalculator.weeklyCompletionByDay
+import android.learn.habitapp.util.backupJson
 import android.learn.habitapp.util.calculateCurrentStreak
 import android.learn.habitapp.util.getCurrentWeekStats
 import android.learn.habitapp.util.getStatsForCurrent
@@ -26,9 +31,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -238,6 +246,73 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
          habitRepository.deleteHabit(habitId = habitId)
 
       }
+   }
+
+   // ── BACKUP & RESTORE ───────────────────────────────────────────────
+   // Suspend (not fire-and-forget like the actions above) because the
+   // caller needs the JSON text back to write it to a file it owns —
+   // the ViewModel has no Context/Uri access to do that part itself.
+
+   /** Snapshot of every habit — active, archived, and every replaced
+    * frequency version — so a restore reconstructs full history, not
+    * just what's currently visible. */
+   suspend fun exportBackupJson(): String {
+      val allHabits = habitRepository.getAllHabitsRaw().first()
+      val dtos = allHabits.map { habitWithLogs ->
+         val habit = habitWithLogs.habit
+         HabitBackupDto(
+            groupId = habit.groupId,
+            name = habit.name,
+            emoji = habit.emoji,
+            frequencyType = habit.frequencyType.name,
+            customDays = habit.customDays,
+            timesPerWeek = habit.timesPerWeek,
+            reminderTime = habit.reminderTime,
+            color = habit.color,
+            sortOrder = habit.sortOrder,
+            isArchived = habit.isArchived,
+            isReplaced = habit.isReplaced,
+            replacedAt = habit.replacedAt,
+            createdAt = habit.createdAt,
+            logDates = habitWithLogs.logs.map { it.date }
+         )
+      }
+      val payload = BackupPayload(exportedAt = System.currentTimeMillis(), habits = dtos)
+      return backupJson.encodeToString(payload)
+   }
+
+   /** Adds every habit from the backup as a NEW row — never reuses the
+    * backup's original id, since insertHabit uses OnConflictStrategy.REPLACE
+    * and an id collision would silently overwrite an existing habit. This
+    * is always an additive merge, never a wipe-and-replace. Returns the
+    * number of habits imported; throws on malformed JSON so the caller
+    * (which owns the UI) can show what went wrong. */
+   suspend fun importBackupJson(json: String): Int {
+      val payload = backupJson.decodeFromString<BackupPayload>(json)
+      payload.habits.forEach { dto ->
+         val newId = habitRepository.insertHabit(
+            HabitEntity(
+               id = 0,
+               groupId = dto.groupId,
+               name = dto.name,
+               emoji = dto.emoji,
+               frequencyType = FrequencyType.valueOf(dto.frequencyType),
+               customDays = dto.customDays,
+               timesPerWeek = dto.timesPerWeek,
+               reminderTime = dto.reminderTime,
+               color = dto.color,
+               sortOrder = dto.sortOrder,
+               isArchived = dto.isArchived,
+               isReplaced = dto.isReplaced,
+               replacedAt = dto.replacedAt,
+               createdAt = dto.createdAt
+            )
+         )
+         dto.logDates.forEach { logDate ->
+            habitRepository.insertHabitLog(HabitLogsEntity(habitId = newId.toInt(), date = logDate))
+         }
+      }
+      return payload.habits.size
    }
 
    private fun transformToUiState(habitWithLogs: List<HabitWithLogs>): List<HabitUiState> {

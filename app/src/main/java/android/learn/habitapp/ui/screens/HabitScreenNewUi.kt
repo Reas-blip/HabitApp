@@ -8,6 +8,7 @@ import android.learn.habitapp.navigation.HabitSharedElementType
 import android.learn.habitapp.navigation.LocalAnimatedVisibilityScope
 import android.learn.habitapp.ui.HabitUiState
 import android.learn.habitapp.ui.UiState
+import android.learn.habitapp.ui.components.ColorFilterRow
 import android.learn.habitapp.ui.components.ErrorScreen
 import android.learn.habitapp.ui.components.LoadingSpinner
 import android.learn.habitapp.ui.theme.HabitColors
@@ -45,10 +46,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -88,6 +91,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import sh.calvin.reorderable.ReorderableCollectionItemScope
 import sh.calvin.reorderable.ReorderableItem
@@ -387,7 +391,7 @@ fun TopBarPreview() {
 }
 
 @Composable
-fun HabitScreenTopAppBar(onSearchClick: () -> Unit) {
+fun HabitScreenTopAppBar(onSearchClick: () -> Unit, onMoreClick: () -> Unit) {
    Row(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically,
@@ -431,8 +435,9 @@ fun HabitScreenTopAppBar(onSearchClick: () -> Unit) {
                icon = rememberVectorPainter(Icons.Filled.MoreVert),
                backgroundColor =  HabitColors.Surface,
                iconTint = Color(0xFF4A5565),
-               elevation = 5.dp
-            ) {}
+               elevation = 5.dp,
+               onClickIcon = onMoreClick
+            )
          }
       }
 
@@ -446,12 +451,13 @@ fun HabitScreen(
    onAddHabit: () -> Unit,
    onHabitClicked: (Int) -> Unit,
    onSearchClick: () -> Unit,
+   onNavigateToArchive: () -> Unit,
 ) {
    val habitUiState by habitViewModel.displayedHabitUiState.collectAsStateWithLifecycle()
    val statsForToday by habitViewModel.habitScreenDayStats.collectAsStateWithLifecycle()
    val weeklyCompletionByDay by habitViewModel.weeklyCompletionByDay.collectAsStateWithLifecycle()
 
-
+   var showOptionsDialog by remember { mutableStateOf(false) }
 
    Column(
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
@@ -462,18 +468,18 @@ fun HabitScreen(
    ) {
 
       HabitScreenTopAppBar(
-
-         onSearchClick,
+         onSearchClick = onSearchClick,
+         onMoreClick = { showOptionsDialog = true },
       )
       HabitOverview(
          todayStats = statsForToday,
          weeklyCompletionByDay = weeklyCompletionByDay
       )
 
-      when (habitUiState) {
+      when (val state = habitUiState) {
          is UiState.Success -> {
             HabitListNewUi(
-               habitList = (habitUiState as UiState.Success).habits,
+               habitList = state.habits,
                onToggleHabitId = { habitId ->
                   habitViewModel.onHabitChecked(habitId)
                },
@@ -488,11 +494,127 @@ fun HabitScreen(
 
          is UiState.Loading -> LoadingSpinner()
 
-         is UiState.Error -> ErrorScreen((habitUiState as UiState.Error).message)
+         is UiState.Error -> ErrorScreen(state.message)
       }
    }
 
+   if (showOptionsDialog) {
+      val fullHabitState by habitViewModel.habitUiState.collectAsStateWithLifecycle()
+      val colorFilter by habitViewModel.colorFilter.collectAsStateWithLifecycle()
+      val availableColors = remember(fullHabitState) {
+         (fullHabitState as? UiState.Success)?.habits
+            ?.mapNotNull { it.color }
+            ?.distinct()
+            ?: emptyList()
+      }
 
+      HabitScreenOptionsDialog(
+         availableColors = availableColors,
+         selectedColor = colorFilter,
+         onColorSelected = habitViewModel::onColorFilterChanged,
+         onNavigateToArchive = {
+            showOptionsDialog = false
+            onNavigateToArchive()
+         },
+         onDismiss = { showOptionsDialog = false }
+      )
+   }
+}
+
+@Composable
+private fun HabitScreenOptionsDialog(
+   availableColors: List<Int>,
+   selectedColor: Int?,
+   onColorSelected: (Int?) -> Unit,
+   onNavigateToArchive: () -> Unit,
+   onDismiss: () -> Unit,
+) {
+   Dialog(onDismissRequest = onDismiss) {
+      Surface(
+         shape = RoundedCornerShape(20.dp),
+         color = HabitColors.Surface,
+         modifier = Modifier.fillMaxWidth()
+      ) {
+         Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(
+               "Options",
+               style = MaterialTheme.typography.titleMedium.copy(color = HabitColors.TextPrimary),
+               modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            )
+
+            Row(
+               modifier = Modifier
+                  .fillMaxWidth()
+                  .clickable { onNavigateToArchive() }
+                  .padding(horizontal = 20.dp, vertical = 14.dp),
+               verticalAlignment = Alignment.CenterVertically,
+               horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+               Icon(
+                  Icons.Outlined.Archive,
+                  contentDescription = null,
+                  tint = HabitColors.PrimaryDark
+               )
+               Text(
+                  "Archived Habits",
+                  color = HabitColors.TextPrimary,
+                  style = MaterialTheme.typography.bodyLarge
+               )
+            }
+
+            HorizontalDivider(color = HabitColors.SoftBorder)
+
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+               Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.CenterVertically
+               ) {
+                  Row(
+                     horizontalArrangement = Arrangement.spacedBy(14.dp),
+                     verticalAlignment = Alignment.CenterVertically
+                  ) {
+                     Icon(
+                        Icons.Outlined.Palette,
+                        contentDescription = null,
+                        tint = HabitColors.PrimaryDark
+                     )
+                     Text(
+                        "Filter by Color",
+                        color = HabitColors.TextPrimary,
+                        style = MaterialTheme.typography.bodyLarge
+                     )
+                  }
+                  if (selectedColor != null) {
+                     Text(
+                        "Clear",
+                        color = HabitColors.Danger,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.clickable { onColorSelected(null) }
+                     )
+                  }
+               }
+
+               if (availableColors.isNotEmpty()) {
+                  Spacer(Modifier.height(10.dp))
+                  ColorFilterRow(
+                     availableColors = availableColors,
+                     selectedColor = selectedColor,
+                     onColorSelected = onColorSelected,
+                     modifier = Modifier.padding(horizontal = 0.dp)
+                  )
+               } else {
+                  Spacer(Modifier.height(6.dp))
+                  Text(
+                     "Add a color to a habit to filter by it.",
+                     color = HabitColors.TextSecondary,
+                     style = MaterialTheme.typography.bodySmall
+                  )
+               }
+            }
+         }
+      }
+   }
 }
 
 //
@@ -734,7 +856,7 @@ fun ArchivableHabitRowNewUi(
    onClickHabit: () -> Unit,
    onArchive: () -> Unit,
    modifier: Modifier = Modifier,
-   reorderableScope: ReorderableCollectionItemScope,
+   reorderableScope: ReorderableCollectionItemScope? = null,
    onDragStopped: () -> Unit = {},
    isArchived: Boolean
 ) {

@@ -5,10 +5,14 @@ import android.learn.habitapp.HabitViewModel
 import android.learn.habitapp.R
 import android.learn.habitapp.navigation.HabitDetail
 import android.learn.habitapp.navigation.animatedComposable
+import android.learn.habitapp.ui.screens.ArchiveScreen
+import android.learn.habitapp.ui.screens.BackupRestoreScreen
 import android.learn.habitapp.ui.screens.HabitItemRoute
 import android.learn.habitapp.ui.screens.HabitScreen
 import android.learn.habitapp.ui.screens.MoreScreen
+import android.learn.habitapp.ui.screens.RemindersScreen
 import android.learn.habitapp.ui.screens.SearchScreenRoute
+import android.learn.habitapp.ui.screens.SettingsScreen
 import android.learn.habitapp.ui.screens.StatsScreen
 import android.learn.habitapp.ui.screens.TodayHabitScreen
 import android.learn.habitapp.ui.theme.HabitColors
@@ -35,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,6 +77,18 @@ sealed interface Destination {
 
    @Serializable
    data object Habits : Destination
+
+   @Serializable
+   data object Archive : Destination
+
+   @Serializable
+   data object Reminders : Destination
+
+   @Serializable
+   data object Settings : Destination
+
+   @Serializable
+   data object BackupRestore : Destination
 
 
 }
@@ -156,7 +173,12 @@ fun HabitAppNewUi(
    Scaffold(
       bottomBar = {
          val showBottomBar = currentDestination?.let {
-               !( it.hasRoute(Destination.HabitDetail::class) || it.hasRoute(Destination.Search::class))
+               !( it.hasRoute(Destination.HabitDetail::class) ||
+                  it.hasRoute(Destination.Search::class) ||
+                  it.hasRoute(Destination.Archive::class) ||
+                  it.hasRoute(Destination.Reminders::class) ||
+                  it.hasRoute(Destination.Settings::class) ||
+                  it.hasRoute(Destination.BackupRestore::class) )
          } ?: false
          if (showBottomBar) BottomNavBar(
             navController,
@@ -200,6 +222,9 @@ fun HabitAppNewUi(
                },
                onSearchClick = {
                   navController.navigate(Destination.Search)
+               },
+               onNavigateToArchive = {
+                  navController.navigate(Destination.Archive)
                }
             )
          }
@@ -211,7 +236,63 @@ fun HabitAppNewUi(
          }
 
          animatedComposable<Destination.More> {
-            MoreScreen()
+            MoreScreen(
+               onNavigateToHabits = {
+                  navController.navigate(Destination.Habits) {
+                     launchSingleTop = true
+                     popUpTo(navController.graph.startDestinationId) { saveState = true }
+                  }
+               },
+               onNavigateToStats = {
+                  navController.navigate(Destination.Stats) {
+                     launchSingleTop = true
+                     popUpTo(navController.graph.startDestinationId) { saveState = true }
+                  }
+               },
+               onNavigateToReminders = { navController.navigate(Destination.Reminders) },
+               onNavigateToSettings = { navController.navigate(Destination.Settings) },
+               onNavigateToBackup = { navController.navigate(Destination.BackupRestore) },
+            )
+         }
+
+         animatedComposable<Destination.Archive> {
+            ArchiveScreen(
+               habitViewModel = habitViewModel,
+               onBack = { navController.popBackStack() },
+               onHabitClicked = { habitId ->
+                  detailViewModel.loadHabit(habitId)
+                  navController.navigate(Destination.HabitDetail(habitId))
+               }
+            )
+         }
+
+         animatedComposable<Destination.Reminders> {
+            RemindersScreen(
+               habitViewModel = habitViewModel,
+               onBack = { navController.popBackStack() },
+               onHabitClicked = { habitId ->
+                  detailViewModel.loadHabit(habitId)
+                  navController.navigate(Destination.HabitDetail(habitId))
+               }
+            )
+         }
+
+         animatedComposable<Destination.Settings> {
+            val settingsContext = LocalContext.current
+            SettingsScreen(
+               onBack = { navController.popBackStack() },
+               canScheduleExactAlarms = detailViewModel::canScheduleExactAlarms,
+               onRequestExactAlarmPermission = {
+                  detailViewModel.requestExactAlarmPermission(settingsContext)
+               }
+            )
+         }
+
+         animatedComposable<Destination.BackupRestore> {
+            BackupRestoreScreen(
+               habitViewModel = habitViewModel,
+               onBack = { navController.popBackStack() }
+            )
          }
 
          animatedComposable<Destination.HabitDetail> { backStackEntry ->

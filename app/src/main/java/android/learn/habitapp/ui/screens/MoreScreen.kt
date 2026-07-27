@@ -29,7 +29,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun MoreScreen() {
+fun MoreScreen(
+   onNavigateToHabits: () -> Unit = {},
+   onNavigateToStats: () -> Unit = {},
+   onNavigateToReminders: () -> Unit = {},
+   onNavigateToSettings: () -> Unit = {},
+   onNavigateToBackup: () -> Unit = {},
+) {
 
    Column(
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
@@ -40,7 +46,17 @@ fun MoreScreen() {
    ) {
       MoreTopAppBar()
       AccountNameCard()
-      MoreMenuCard()
+      MoreMenuCard(
+         onItemClick = { label ->
+            when (label) {
+               "Habits" -> onNavigateToHabits()
+               "Stats & Insights" -> onNavigateToStats()
+               "Reminders" -> onNavigateToReminders()
+               "Settings" -> onNavigateToSettings()
+               "Backup & Restore" -> onNavigateToBackup()
+            }
+         }
+      )
 
    }
 }
@@ -114,7 +130,7 @@ val moreMenuItems = listOf(
 
 @Preview
 @Composable
-fun MoreMenuCard() {
+fun MoreMenuCard(onItemClick: (String) -> Unit = {}) {
    Column(
       verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.Top),
       horizontalAlignment = Alignment.Start,
@@ -139,7 +155,7 @@ fun MoreMenuCard() {
             .padding(top = 16.dp.scaledWidth(), bottom = 8.dp.scaledWidth())
       )
       moreMenuItems.forEach {
-        MoreMenuItem(it.label, it.sub,painterResource(it.iconId), it.color)
+        MoreMenuItem(it.label, it.sub, painterResource(it.iconId), it.color, onClick = { onItemClick(it.label) })
       }
 
    }

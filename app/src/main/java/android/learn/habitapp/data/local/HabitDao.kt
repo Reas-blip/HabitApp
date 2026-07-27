@@ -16,6 +16,12 @@ interface HabitDao {
    suspend fun insertHabit(habit: HabitEntity): Long
 
 
+   @Query("DELETE FROM habits")
+   suspend fun deleteAllHabits()
+
+   @Query("DELETE FROM habit_logs")
+   suspend fun deleteAllLogs()
+
    @Update
    suspend fun updateHabit(habit: HabitEntity)
 

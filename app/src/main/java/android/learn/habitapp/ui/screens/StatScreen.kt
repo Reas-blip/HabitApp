@@ -9,6 +9,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -341,6 +343,12 @@ fun HabitCompletion(
    color: Color,
    completionPercent: Int
 ) {
+
+   val animatedPercent by animateIntAsState(
+      completionPercent,
+      animationSpec = spring(),
+      label = "HabitCompletionProgressBar",
+   )
    Row(
       horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.Start),
       verticalAlignment = Alignment.CenterVertically,
@@ -392,7 +400,7 @@ fun HabitCompletion(
 
          Spacer(Modifier.size(4.dp))
          LinearProgressIndicator(
-            progress = { (completionPercent / 100f) },
+            progress = { (animatedPercent / 100f) },
             modifier = Modifier.fillMaxWidth(),
             color = color,
             gapSize = (-10).dp,
