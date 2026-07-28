@@ -166,6 +166,7 @@ class HabitViewModel @Inject constructor(private val habitRepository: HabitRepos
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0 to 0)
 
    private val _statScreenTimeframe = MutableStateFlow(Timeframe.WEEK)
+   val statScreenTimeframe = _statScreenTimeframe.asStateFlow()
    val statScreenOverviewStats: StateFlow<OverviewStats> = combine(
       statsHabitsWithLogs, _statScreenTimeframe
    ) { habitsWithLogs, timeframe ->

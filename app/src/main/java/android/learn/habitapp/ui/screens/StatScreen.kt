@@ -9,7 +9,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -60,11 +59,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 
-val statSegementedControl = mapOf(
-   "Week" to Timeframe.WEEK,
-   "Month" to Timeframe.MONTH,
-   "Year" to Timeframe.YEAR
-)
+data class SegmentItem(val name: String, val timeframe: Timeframe)
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,6 +68,7 @@ fun StatsScreen(habitViewModel: HabitViewModel) {
 
    val statScreenOverviewStats by habitViewModel.statScreenOverviewStats.collectAsStateWithLifecycle()
    val streakPair by habitViewModel.streakPair.collectAsStateWithLifecycle()
+   val activeTimeframe by habitViewModel.statScreenTimeframe.collectAsStateWithLifecycle()
 
    Column(
       verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.Top),
@@ -82,6 +79,7 @@ fun StatsScreen(habitViewModel: HabitViewModel) {
    ) {
 
       StatsTopAppBar(
+         activeTimeframe,
          habitViewModel::onStatScreenTimeframeChange
       )
 
@@ -99,13 +97,12 @@ fun StatsScreen(habitViewModel: HabitViewModel) {
 }
 
 
-@Preview
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun SegmentedControl(
-   segments: List<String> = listOf("Analytics", "Security", "Settings"),
-   initialSelected: String = "Analytics",
-   onSegmentSelected: (String) -> Unit = {}
+   segments: List<SegmentItem>,
+   initialSelected: SegmentItem = SegmentItem("Week", Timeframe.WEEK),
+   onSegmentSelected: (SegmentItem) -> Unit = {}
 ) {
    // 1. Properly hoist and track state matching your signature
    var selectedSegment by remember { mutableStateOf(initialSelected) }
@@ -128,7 +125,7 @@ fun SegmentedControl(
       ) {
          segments.forEach { segment ->
 
-            val isSelected = selectedSegment == segment
+            val isSelected = selectedSegment.name == segment.name
 
             Box(
                contentAlignment = Alignment.Center,
@@ -182,7 +179,7 @@ fun SegmentedControl(
                      if (isSelected) textColor.animateTo(Color.White)
                   }
                   Text(
-                     text = segment,
+                     text = segment.name,
                      color = if (isSelected) Color.White else Color.Gray,
                      fontSize = 12.sp,
                      fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
@@ -205,10 +202,17 @@ fun SegmentedControl(
 
 @Composable
 fun StatsTopAppBar(
+   activeTimeframe: Timeframe,
    onSegmentSelected: (Timeframe) -> Unit
 ) {
 
-   val segments: List<String> = statSegementedControl.keys.toList()
+   val statSegmentedControl = listOf(
+      SegmentItem("Week", Timeframe.WEEK),
+      SegmentItem("Month", Timeframe.MONTH),
+      SegmentItem("Year", Timeframe.YEAR),
+   )
+   val activeSegment = statSegmentedControl.first { it.timeframe == activeTimeframe }
+
    Row(
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically,
@@ -225,10 +229,10 @@ fun StatsTopAppBar(
          )
       )
       SegmentedControl(
-         segments = segments,
-         initialSelected = segments[0]
-      ) { timeframeName ->
-         onSegmentSelected(statSegementedControl.getValue(timeframeName))
+         segments = statSegmentedControl,
+         initialSelected = activeSegment
+      ) { segmentItem ->
+         onSegmentSelected(segmentItem.timeframe)
       }
 
 
@@ -283,7 +287,7 @@ fun HabitStatOverview(
             emoji = "🔥",
             statInfo = "$currentStreak",
             statDescription = "Current Streak",
-                    modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f)
          )
 
          Stat(
