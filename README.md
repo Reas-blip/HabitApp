@@ -1,5 +1,7 @@
 # HabitApp
 
+https://github.com/user-attachments/assets/4893dece-a065-44b7-855c-219b92db55d2
+
 A native Android habit tracker built with Jetpack Compose, focused on reliable local-first tracking: create habits with flexible schedules, get reminded even after a phone reboot, and see real streaks calculated from actual logged history — not just a day counter.
 
 ## Features
